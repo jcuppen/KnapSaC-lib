@@ -12,8 +12,8 @@ pub struct Registry {
 }
 
 impl Registry {
-    fn find_by_local_location(&self, local_location: &Path) -> Option<&Package> {
-        let inferred_working_directory = infer_working_directory(local_location);
+    fn find_by_local_location(&self, local_location: &PathBuf) -> Option<&Package> {
+        let inferred_working_directory = infer_working_directory(&local_location);
         self.packages
             .iter()
             .find(|p| p.local_location == inferred_working_directory)
@@ -24,7 +24,7 @@ impl Registry {
     ///
     /// Criteria for being detected as a package are:
     /// - Being in a git repository
-    pub fn contains(&self, local_location: &Path) -> bool {
+    pub fn contains(&self, local_location: &PathBuf) -> bool {
         self.find_by_local_location(local_location).is_some()
     }
 
@@ -176,14 +176,14 @@ impl Registry {
     ///
     /// registry.add(&path);
     /// ```
-    pub fn add(&mut self, path: &Path) {
-        let local_repository_root = infer_working_directory(path);
+    pub fn add(&mut self, path: &PathBuf) {
+        let local_repository_root = infer_working_directory(&path);
 
-        if self.contains(path) {
+        if self.contains(&path) {
             panic!()
         }
 
-        let repository = discover_git_repository(path);
+        let repository = discover_git_repository(&path);
 
         self.packages
             .push(create_package(local_repository_root, repository));
@@ -262,7 +262,7 @@ impl Registry {
     ///
     /// registry.remove(&path);
     /// ```
-    pub fn remove(&mut self, local_location: &Path) {
+    pub fn remove(&mut self, local_location: &PathBuf) {
         let local_repository_root = infer_working_directory(local_location);
         self.packages
             .retain(|p| p.local_location != local_repository_root);

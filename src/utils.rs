@@ -1,15 +1,14 @@
 use git2::Repository;
-use std::path::{Path, PathBuf};
-use url::Url;
+use std::path::PathBuf;
 
-pub(crate) fn discover_git_repository(path: &Path) -> Repository {
+pub(crate) fn discover_git_repository(path: &PathBuf) -> Repository {
     Repository::discover(path).expect(&*format!(
         "Failed to discover repository @ {}",
         path.display()
     ))
 }
 
-pub(crate) fn infer_working_directory(path: &Path) -> PathBuf {
+pub(crate) fn infer_working_directory(path: &PathBuf) -> PathBuf {
     discover_git_repository(path)
         .workdir()
         .expect(&*format!(
