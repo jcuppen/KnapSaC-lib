@@ -1,8 +1,11 @@
+use std::fs::{read_to_string, write};
 use crate::package::RegistrationStatus::{Known, Registered};
 use git2::string_array::StringArray;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use url::Url;
+use crate::dependency::Dependency;
 
 #[derive(Deserialize, Serialize, Clone, PartialEq)]
 pub(crate) enum RegistrationStatus {
@@ -17,14 +20,14 @@ pub(crate) struct Package {
     pub(crate) remote_location: Option<String>,
 }
 
-pub(crate) fn create_package(local_repository_root: PathBuf, repository: Repository) -> Package {
+pub(crate) fn create_package<P: Clone + AsRef<Path>>(local_repository_root: P, repository: Repository) -> Package {
     let string_array = repository.remotes().unwrap();
 
     if string_array.is_empty() {
-        return create_known_package(local_repository_root);
+        return create_known_package(local_repository_root.as_ref().to_path_buf());
     }
 
-    create_registered_package(local_repository_root, repository, string_array)
+    create_registered_package(local_repository_root.as_ref().to_path_buf(), repository, string_array)
 }
 
 fn create_registered_package(
@@ -38,11 +41,11 @@ fn create_registered_package(
     Package {
         registration_status: Registered,
         local_location: local_repository_root,
-        remote_location: Some(String::from(remote.url().unwrap())),
+        remote_location: Some(remote.url().unwrap().to_string()),
     }
 }
 
-fn create_known_package(local_repository_root: PathBuf, /*manifest_location: PathBuf*/) -> Package {
+fn create_known_package(local_repository_root: PathBuf) -> Package {
     Package {
         registration_status: Known,
         local_location: local_repository_root,
@@ -51,34 +54,46 @@ fn create_known_package(local_repository_root: PathBuf, /*manifest_location: Pat
 }
 
 impl Package {
-    // fn manifest_location(&self) -> PathBuf {
-    //     let mut p = self.local_location.clone();
-    //     p.push("dependencies");
-    //     p.set_extension("json");
-    //     p
-    // }
+    fn manifest_location(&self) -> PathBuf {
+        let mut path: PathBuf = self.local_location.clone();
+        path.push("dependencies");
+        path.set_extension("json");
+        path
+    }
 
-    // pub(crate) fn add_dependency(&self, value: String) {
-    //     let new_dep = Dependency { git_url: value };
-    //     if let Ok(data) = read_to_string(self.manifest_location()) {
-    //         let mut dependencies: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
-    //         dependencies.push(new_dep);
-    //         dependencies.sort();
-    //         dependencies.dedup();
-    //         let contents = serde_json::to_string(&dependencies).unwrap();
-    //         write(self.manifest_location(), contents).unwrap()
-    //     }
-    // }
+    pub(crate) fn add_dependency(&self, url: Url) {
+        let dependency = Dependency { git_url: url };
+        let result = read_to_string(self.manifest_location());
+        let mut dependencies: Vec<Dependency> = vec![];
 
-    // pub(crate) fn remove_dependency(&self, value: String) {
-    //     let dep_to_remove = Dependency { git_url: value };
-    //     if let Ok(data) = read_to_string(self.manifest_location()) {
-    //         let mut dependencies: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
-    //         if let Some(index) = dependencies.iter().position(|d| d == &dep_to_remove) {
-    //             dependencies.remove(index);
-    //         }
-    //         let contents = serde_json::to_string(&dependencies).unwrap();
-    //         write(self.manifest_location(), contents).unwrap()
-    //     }
-    // }
+        if let Ok(data) = result {
+            dependencies = serde_json::from_str(&*data).unwrap();
+        }
+
+        dependencies.push(dependency);
+        dependencies.sort();
+        dependencies.dedup();
+        let contents = serde_json::to_string(&dependencies).unwrap();
+        write(self.manifest_location(), contents).unwrap()
+    }
+
+    pub(crate) fn get_dependencies(&self) -> Vec<Dependency> {
+        if let Ok(data) = read_to_string(self.manifest_location())  {
+            let d: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
+            return d.clone()
+        }
+        return vec![];
+    }
+
+    pub(crate) fn remove_dependency(&self, value: Url) {
+        let dep_to_remove = Dependency { git_url: value };
+        if let Ok(data) = read_to_string(self.manifest_location()) {
+            let mut dependencies: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
+            if let Some(index) = dependencies.iter().position(|d| d == &dep_to_remove) {
+                dependencies.remove(index);
+            }
+            let contents = serde_json::to_string(&dependencies).unwrap();
+            write(self.manifest_location(), contents).unwrap()
+        }
+    }
 }

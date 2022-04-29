@@ -4,7 +4,7 @@ use std::fs;
 use crate::registry::Registry;
 use git2::Repository;
 use std::fs::read_to_string;
-use std::path::PathBuf;
+use std::path::{Path};
 use nanoid::nanoid;
 use url::Url;
 
@@ -15,8 +15,7 @@ mod utils;
 
 /// Loads a [Registry] based on the given [Path]
 ///
-/// # Example
-///
+/// # Examples
 /// ```
 /// use std::env::temp_dir;
 /// use std::fs::write;
@@ -31,7 +30,7 @@ mod utils;
 /// assert!(path.exists());
 /// assert!(path.is_file());
 ///
-/// let registry = load_registry(path);
+/// let registry = load_registry(&path);
 /// ```
 ///
 /// # Panics
@@ -45,7 +44,7 @@ mod utils;
 /// path.push("nonexistent.json");
 /// assert!(!path.exists());
 ///
-/// let registry = load_registry(path);
+/// let registry = load_registry(&path);
 /// ```
 ///
 /// Panics when there is no JSON file at given [Path]
@@ -57,7 +56,7 @@ mod utils;
 /// assert!(path.exists());
 /// assert!(path.is_file());
 ///
-/// let registry = load_registry(path);
+/// let registry = load_registry(&path);
 /// ```
 ///
 /// Panics when the given JSON file is not valid JSON
@@ -79,7 +78,7 @@ mod utils;
 /// assert!(contents.is_ok());
 /// assert_eq!(contents.unwrap(), String::from("{"));
 ///
-/// let registry = load_registry(path);
+/// let registry = load_registry(&path);
 /// ```
 ///
 /// Panics when JSON cannot be parsed to a valid [Registry]
@@ -101,13 +100,13 @@ mod utils;
 /// assert!(contents.is_ok());
 /// assert_eq!(contents.unwrap(), String::from("{ \"packages\": 12 }"));
 ///
-/// let registry = load_registry(path);
+/// let registry = load_registry(&path);
 /// ```
-pub fn load_registry(path: PathBuf) -> Registry {
+pub fn load_registry<P: AsRef<Path>>(path: P) -> Registry {
     if let Ok(data) = read_to_string(&path) {
         return serde_json::from_str(data.as_str()).unwrap();
     }
-    panic!("No registry found @ {}", path.display())
+    panic!("No registry found @ {}", path.as_ref().display())
 }
 
 /// Creates a new empty [Registry].
@@ -182,17 +181,17 @@ pub fn initialize_registry() -> Registry {
 ///
 /// assert!(path.is_file());
 ///
-/// download(&mut registry, url, &path);
+/// download(&mut registry, url, path);
 /// ```
-pub fn download(registry: &mut Registry, url: Url, path: &PathBuf) {
-    if !path.is_dir() {
-        panic!("No directory found @ {}", path.display());
+pub fn download<P: AsRef<Path>>(registry: &mut Registry, url: Url, path: P) {
+    if !path.as_ref().is_dir() {
+        panic!("No directory found @ {}", path.as_ref().display());
     }
-    let mut repository_path = path.to_path_buf();
+    let mut repository_path = path.as_ref().to_path_buf();
     repository_path.push(nanoid!());
     fs::create_dir(&repository_path).unwrap();
     if Repository::clone(url.as_str(), &repository_path).is_err() {
-        panic!("Failed to download package from `{}` to `{}`", url, path.display())
+        panic!("Failed to download package from `{}` to `{}`", url, path.as_ref().display())
     };
     registry.add(&repository_path);
 }

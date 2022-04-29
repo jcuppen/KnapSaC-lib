@@ -1,7 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
+use url::Url;
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Deserialize, Serialize)]
-pub(crate) struct Dependency {
-    pub(crate) git_url: String,
+#[derive(Deserialize, Serialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone)]
+pub struct Dependency {
+    pub(crate) git_url: Url,
 }
