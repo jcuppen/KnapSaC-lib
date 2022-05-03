@@ -1,11 +1,12 @@
 extern crate core;
 
-use std::fs;
 use crate::registry::Registry;
+
 use git2::Repository;
-use std::fs::read_to_string;
-use std::path::{Path};
 use nanoid::nanoid;
+use std::fs;
+use std::fs::read_to_string;
+use std::path::Path;
 use url::Url;
 
 mod dependency;
@@ -19,7 +20,6 @@ mod utils;
 /// ```
 /// use std::env::temp_dir;
 /// use std::fs::write;
-/// use std::path::Path;
 /// use knapsac_lib::load_registry;
 ///
 /// let mut path = temp_dir();
@@ -39,9 +39,10 @@ mod utils;
 /// ```rust,should_panic
 /// use std::env::temp_dir;
 /// use knapsac_lib::load_registry;
-/// let mut path = temp_dir();
 ///
+/// let mut path = temp_dir();
 /// path.push("nonexistent.json");
+///
 /// assert!(!path.exists());
 ///
 /// let registry = load_registry(&path);
@@ -51,8 +52,10 @@ mod utils;
 /// ```rust,should_panic
 /// use std::env::temp_dir;
 /// use knapsac_lib::load_registry;
+///
 /// let mut path = temp_dir();
 /// path.push("registry.txt");
+///
 /// assert!(path.exists());
 /// assert!(path.is_file());
 ///
@@ -117,6 +120,7 @@ pub fn load_registry<P: AsRef<Path>>(path: P) -> Registry {
 /// use knapsac_lib::registry::Registry;
 ///
 /// let registry = initialize_registry();
+///
 /// assert!(registry.is_empty())
 /// ```
 pub fn initialize_registry() -> Registry {
@@ -129,8 +133,6 @@ pub fn initialize_registry() -> Registry {
 /// # Examples
 /// ```
 /// use std::env::temp_dir;
-/// use std::fs;
-/// use std::fs::{read_to_string, write};
 /// use url::Url;
 /// use knapsac_lib::{download, initialize_registry, load_registry};
 ///
@@ -150,8 +152,6 @@ pub fn initialize_registry() -> Registry {
 /// Panics when no directory exists at given [Path]
 /// ```rust,should_panic
 /// use std::env::temp_dir;
-/// use std::fs;
-/// use std::fs::{read_to_string, write};
 /// use url::Url;
 /// use knapsac_lib::{download, initialize_registry, load_registry};
 ///
@@ -167,8 +167,7 @@ pub fn initialize_registry() -> Registry {
 /// Panics when given [Path] points to a file
 /// ```rust,should_panic
 /// use std::env::temp_dir;
-/// use std::fs;
-/// use std::fs::{read_to_string, write};
+/// use std::fs::write;
 /// use url::Url;
 /// use knapsac_lib::{download, initialize_registry, load_registry};
 ///
@@ -191,7 +190,11 @@ pub fn download<P: AsRef<Path>>(registry: &mut Registry, url: Url, path: P) {
     repository_path.push(nanoid!());
     fs::create_dir(&repository_path).unwrap();
     if Repository::clone(url.as_str(), &repository_path).is_err() {
-        panic!("Failed to download package from `{}` to `{}`", url, path.as_ref().display())
+        panic!(
+            "Failed to download package from `{}` to `{}`",
+            url,
+            path.as_ref().display()
+        )
     };
     registry.add(&repository_path);
 }

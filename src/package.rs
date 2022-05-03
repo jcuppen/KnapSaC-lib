@@ -1,23 +1,30 @@
-use std::fs::{read_to_string, write};
 use crate::package::RegistrationStatus::{Known, Registered};
+use crate::dependency::Dependency;
+
+use std::fs::{read_to_string, write};
 use git2::string_array::StringArray;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use url::Url;
-use crate::dependency::Dependency;
 
-#[derive(Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Deserialize, Serialize)]
+#[derive(Clone)]
+#[derive(Debug)]
+#[derive(PartialEq)]
 pub(crate) enum RegistrationStatus {
     Registered,
     Known,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize)]
+#[derive(Clone)]
+#[derive(Debug)]
+#[derive(PartialEq)]
 pub(crate) struct Package {
     pub(crate) registration_status: RegistrationStatus,
     pub(crate) local_location: PathBuf,
-    pub(crate) remote_location: Option<String>,
+    pub(crate) remote_location: Option<Url>,
 }
 
 pub(crate) fn create_package<P: Clone + AsRef<Path>>(local_repository_root: P, repository: Repository) -> Package {
@@ -41,7 +48,7 @@ fn create_registered_package(
     Package {
         registration_status: Registered,
         local_location: local_repository_root,
-        remote_location: Some(remote.url().unwrap().to_string()),
+        remote_location: Url::parse(remote.url().unwrap()).ok(),
     }
 }
 
@@ -80,7 +87,7 @@ impl Package {
     pub(crate) fn get_dependencies(&self) -> Vec<Dependency> {
         if let Ok(data) = read_to_string(self.manifest_location())  {
             let d: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
-            return d.clone()
+            return d
         }
         return vec![];
     }
