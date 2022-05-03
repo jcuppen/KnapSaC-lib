@@ -1,7 +1,7 @@
-use crate::package::RegistrationStatus::{Known, Registered};
-use crate::dependency::Dependency;
 
-use std::fs::{read_to_string, write};
+use crate::package::RegistrationStatus::{Known, Registered};
+use crate::manifest::Manifest;
+
 use git2::string_array::StringArray;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
@@ -30,11 +30,13 @@ pub(crate) struct Package {
 pub(crate) fn create_package<P: Clone + AsRef<Path>>(local_repository_root: P, repository: Repository) -> Package {
     let string_array = repository.remotes().unwrap();
 
-    if string_array.is_empty() {
-        return create_known_package(local_repository_root.as_ref().to_path_buf());
-    }
+    let package = match string_array.is_empty() {
+        true => create_known_package(local_repository_root.as_ref().to_path_buf()),
+        false => create_registered_package(local_repository_root.as_ref().to_path_buf(), repository, string_array),
+    };
 
-    create_registered_package(local_repository_root.as_ref().to_path_buf(), repository, string_array)
+    Manifest::initialize().save(package.manifest_location());
+    package
 }
 
 fn create_registered_package(
@@ -45,22 +47,34 @@ fn create_registered_package(
     let remote_name_str = remotes.get(0).unwrap();
     let remote = repository.find_remote(remote_name_str).unwrap();
 
-    Package {
+    let package = Package {
         registration_status: Registered,
         local_location: local_repository_root,
         remote_location: Url::parse(remote.url().unwrap()).ok(),
-    }
+    };
+
+    Manifest::initialize().save(package.manifest_location());
+
+    package
 }
 
 fn create_known_package(local_repository_root: PathBuf) -> Package {
-    Package {
+    let package = Package {
         registration_status: Known,
         local_location: local_repository_root,
         remote_location: None,
-    }
+    };
+
+    Manifest::initialize().save(package.manifest_location());
+
+    package
 }
 
 impl Package {
+    fn load_manifest(&self) -> Manifest {
+        Manifest::load(self.manifest_location())
+    }
+
     fn manifest_location(&self) -> PathBuf {
         let mut path: PathBuf = self.local_location.clone();
         path.push("dependencies");
@@ -69,38 +83,22 @@ impl Package {
     }
 
     pub(crate) fn add_dependency(&self, url: Url) {
-        let dependency = Dependency { git_url: url };
-        let result = read_to_string(self.manifest_location());
-        let mut dependencies: Vec<Dependency> = vec![];
-
-        if let Ok(data) = result {
-            dependencies = serde_json::from_str(&*data).unwrap();
-        }
-
-        dependencies.push(dependency);
-        dependencies.sort();
-        dependencies.dedup();
-        let contents = serde_json::to_string(&dependencies).unwrap();
-        write(self.manifest_location(), contents).unwrap()
+        let mut manifest = self.load_manifest();
+        manifest.add_dependency(url);
+        manifest.save(self.manifest_location());
     }
 
-    pub(crate) fn get_dependencies(&self) -> Vec<Dependency> {
-        if let Ok(data) = read_to_string(self.manifest_location())  {
-            let d: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
-            return d
-        }
-        return vec![];
-    }
+    // pub(crate) fn get_dependencies(&self) -> Vec<Dependency> {
+    //     if let Ok(data) = read_to_string(self.manifest_location())  {
+    //         let d: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
+    //         return d
+    //     }
+    //     return vec![];
+    // }
 
-    pub(crate) fn remove_dependency(&self, value: Url) {
-        let dep_to_remove = Dependency { git_url: value };
-        if let Ok(data) = read_to_string(self.manifest_location()) {
-            let mut dependencies: Vec<Dependency> = serde_json::from_str(&*data).unwrap();
-            if let Some(index) = dependencies.iter().position(|d| d == &dep_to_remove) {
-                dependencies.remove(index);
-            }
-            let contents = serde_json::to_string(&dependencies).unwrap();
-            write(self.manifest_location(), contents).unwrap()
-        }
+    pub(crate) fn remove_dependency(&self, url: Url) {
+        let mut manifest = self.load_manifest();
+        manifest.remove_dependency(url);
+        manifest.save(self.manifest_location());
     }
 }
