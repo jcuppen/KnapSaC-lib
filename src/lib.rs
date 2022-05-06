@@ -1,8 +1,9 @@
 extern crate core;
 
-mod dependency;
-mod package;
+pub mod dependency;
+pub mod package;
 pub mod registry;
-mod utils;
-mod module;
+pub mod module;
+
 mod manifest;
+mod utils;

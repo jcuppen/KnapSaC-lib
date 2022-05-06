@@ -1,581 +1,393 @@
-use crate::package::{create_package, Package};
-use crate::utils::{discover_git_repository, infer_working_directory};
-use crate::package::RegistrationStatus::{Known, Registered};
+use crate::package::Package;
+use crate::utils::infer_working_directory;
 
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
-use std::fs::{create_dir, read_to_string, write};
-use std::path::Path;
-use git2::Repository;
-use nanoid::nanoid;
-use url::Url;
+use std::fs::{read_to_string, write};
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize, Serialize)]
 #[derive(Debug)]
 #[derive(PartialEq)]
-/// A [Registry] represents all packages managed by KnapSaC
+/// A [`Registry`] represents all [`Package`]s managed by KnapSaC
 pub struct Registry {
-    pub(crate) packages: Vec<Package>,
+    #[serde(skip)]
+    pub(crate) location: PathBuf,
+    pub(crate) packages: HashSet<Package>,
 }
 
 impl Registry {
-    /// Creates a new empty [Registry].
+    /// Creates a new empty [`Registry`] and writes it to the given [`Path`]
     ///
     /// # Examples
     /// ```
-    /// use knapsac_lib::registry::Registry;
+    /// # use std::env;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let registry = Registry::initialize();
-    ///
-    /// assert!(registry.is_empty())
+    /// let path = env::temp_dir().join("registry.json");
+    /// # assert!(Registry::initialize(path).is_empty())
     /// ```
-    pub fn initialize() -> Registry {
-        Registry { packages: vec![] }
+    pub fn initialize<P: AsRef<Path>>(path: P) -> Self {
+        let registry = Registry {
+            location: path.as_ref().to_path_buf(),
+            packages: HashSet::new()
+        };
+        registry.save().unwrap();
+        registry
     }
 
-    /// Loads a [Registry] based on the given [Path]
+    /// Loads and returns a [`Registry`] based on the given [`Path`]
     ///
     /// # Examples
     /// ```
-    /// use std::env::temp_dir;
-    /// use std::fs::write;
-    /// use knapsac_lib::registry::Registry;
+    /// # use std::{env, fs};
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut path = temp_dir();
-    /// path.push("registry.json");
-    ///
-    /// write(&path, "{\"packages\": []}").unwrap();
-    ///
-    /// assert!(path.exists());
-    /// assert!(path.is_file());
-    ///
+    /// let path = env::temp_dir().join("registry.json");
+    /// fs::write(&path, "{\"packages\": []}").unwrap();
+    /// # assert!(path.exists());
+    /// # assert!(path.is_file());
     /// let registry = Registry::load(path);
+    /// assert!(registry.is_empty())
     /// ```
     ///
     /// # Panics
+    /// Panics when there is no file at given [`Path`]
+    /// ```rust, should_panic
+    /// # use std::env;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// Panics when there is no file at given [Path]
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("nonexistent.json");
-    ///
+    /// let path = env::temp_dir().join("nonexistent.json");
     /// assert!(!path.exists());
-    ///
     /// let registry = Registry::load(path);
     /// ```
+    /// Panics when there is no JSON file at given [`Path`]
+    /// ```rust, should_panic
+    /// # use std::env;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// Panics when there is no JSON file at given [Path]
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("registry.txt");
-    ///
+    /// let path = env::temp_dir().join("registry.txt");
     /// assert!(path.exists());
     /// assert!(path.is_file());
-    ///
     /// let registry = Registry::load(path);
     /// ```
-    ///
     /// Panics when the given JSON file is not valid JSON
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use std::fs::{read_to_string, write};
-    /// use knapsac_lib::registry::Registry;
+    /// ```rust, should_panic
+    /// # use std::{env, fs};
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut path = temp_dir();
-    /// path.push("invalid.json");
-    ///
-    /// write(&path, "{").unwrap();
-    ///
-    /// assert!(path.exists());
-    /// assert!(path.is_file());
-    ///
-    /// let contents = read_to_string(&path);
-    ///
-    /// assert!(contents.is_ok());
-    /// assert_eq!(contents.unwrap(), String::from("{"));
-    ///
+    /// let path = env::temp_dir().join("invalid.json");
+    /// fs::write(&path, "{").unwrap();
+    /// # assert!(path.exists());
+    /// # assert!(path.is_file());
+    /// let contents = fs::read_to_string(&path);
+    /// # assert_eq!(contents.unwrap(), String::from("{"));
     /// let registry = Registry::load(path);
     /// ```
+    /// Panics when JSON cannot be parsed to a valid [`Registry`]
+    /// ```rust, should_panic
+    /// # use std::{env, fs};
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// Panics when JSON cannot be parsed to a valid [Registry]
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use std::fs::{read_to_string, write};
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("invalid.json");
-    ///
-    /// write(&path, "{ \"packages\": 12 }").unwrap();
-    ///
-    /// assert!(path.exists());
-    /// assert!(path.is_file());
-    ///
-    /// let contents = read_to_string(&path);
-    ///
-    /// assert!(contents.is_ok());
-    /// assert_eq!(contents.unwrap(), String::from("{ \"packages\": 12 }"));
-    ///
+    /// let path = env::temp_dir().join("invalid.json");
+    /// fs::write(&path, "{ \"packages\": 12 }").unwrap();
+    /// # assert!(path.exists());
+    /// # assert!(path.is_file());
+    /// # let contents = fs::read_to_string(&path);
+    /// # assert_eq!(contents.unwrap(), String::from("{ \"packages\": 12 }"));
     /// let registry = Registry::load(path);
     /// ```
-    pub fn load<P: AsRef<Path>>(path: P) -> Registry {
+    pub fn load<P: AsRef<Path>>(path: P) -> Self {
         if let Ok(data) = read_to_string(&path) {
-            return serde_json::from_str(data.as_str()).unwrap();
+            let mut registry: Registry = serde_json::from_str(data.as_str()).unwrap();
+            registry.location = path.as_ref().to_path_buf();
+            return registry
         }
         panic!("No registry found @ {}", path.as_ref().display())
     }
 
-    /// Downloads the package located at given [Url] to given [Path]
-    /// and add the new package to the [Registry]
+    /// Retrieves the [`Package`] that is registered at the given [`Path`]
+    ///
+    /// # Arguments
+    /// * `local_location` - [`Path`] pointing to a location for which a [`Package`] should be registered.
     ///
     /// # Examples
+    /// An example of a [`Package`] being found
     /// ```
-    /// use std::env::temp_dir;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
+    /// # use std::env;
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let mut path = temp_dir();
+    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    /// # assert!(package_path.is_dir());
+    /// let package = Package::create(&package_path);
+    /// registry.add(package.clone());
+    /// assert_eq!(registry.get_by_local_location(package_path), Some(&package));
+    /// ```
+    /// An example of a [`Package`] not being found
+    /// ```
+    /// # use std::{env, fs};
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// assert!(path.exists());
+    /// let registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    /// let package = Package::create(&package_path);
     /// assert!(registry.is_empty());
-    ///
-    /// registry.download(url, &path);
-    ///
-    /// assert!(!registry.is_empty());
+    /// assert!(registry.get_by_local_location(&package_path).is_none());
     /// ```
-    ///
     /// # Panics
-    /// Panics when no directory exists at given [Path]
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
+    /// Panics when given [`Path`] does not point to a git repository
+    /// ```rust, should_panic
+    /// # use std::{env, fs};
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let mut path = temp_dir();
-    /// path.push("invalid_dir");
-    ///
-    /// assert!(!path.exists());
-    ///
-    /// registry.download(url, &path);
-    /// ```
-    /// Panics when given [Path] points to a file
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use std::fs::write;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let mut path = temp_dir();
-    /// path.push("invalid.txt");
-    ///
-    /// write(&path, "hello");
-    ///
-    /// assert!(path.is_file());
-    ///
-    /// registry.download(url, path);
-    /// ```
-    pub fn download<P: AsRef<Path>>(&mut self, url: Url, path: P) {
-        if !path.as_ref().is_dir() {
-            panic!("No directory found @ {}", path.as_ref().display());
-        }
-        let mut repository_path = path.as_ref().to_path_buf();
-        repository_path.push(nanoid!());
-        create_dir(&repository_path).unwrap();
-        if Repository::clone(url.as_str(), &repository_path).is_err() {
-            panic!(
-                "Failed to download package from `{}` to `{}`",
-                url,
-                path.as_ref().display()
-            )
-        };
-        self.add(&repository_path);
-    }
-
-    fn find_by_local_location<P: AsRef<Path>>(&self, local_location: P) -> Option<&Package> {
-        let inferred_working_directory = infer_working_directory(&local_location);
-        self.packages
-            .iter()
-            .find(|p| p.local_location == inferred_working_directory)
-    }
-
-    /// Searches the given [Path] for a package and checks whether it is considered a 'registered'
-    /// package
-    ///
-    /// A package is considered [Registered] when it has at least one git remote
-    /// # Examples
-    /// ```rust
-    /// use std::env::temp_dir;
-    /// use git2::Repository;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_registered");
-    /// let url = Url::parse("https://github.com/jcuppen/mock-package-registered.git").unwrap();
-    /// let repo = Repository::init(&path).unwrap();
-    /// repo.remote("origin", url.to_string().as_str());
-    ///
-    /// assert!(path.is_dir());
+    /// let registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("not_a_repository");
+    /// fs::remove_dir_all(&package_path);
+    /// assert!(!package_path.exists());
     /// assert!(registry.is_empty());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(registry.is_registered(&path));
+    /// assert!(registry.get_by_local_location(&package_path).is_none());
     /// ```
-    pub fn is_registered<P: AsRef<Path>>(&self, local_location: P) -> bool {
-        if let Some(package) = self.find_by_local_location(local_location) {
-            return package.registration_status == Registered;
-        }
-        panic!()
+    pub fn get_by_local_location<P: AsRef<Path>>(&self, local_location: P) -> Option<&Package> {
+        let inferred_working_directory = infer_working_directory(local_location);
+        self.packages.iter().find(|p|p.local_location == inferred_working_directory)
     }
 
-    /// Searches the given [Path] for a package and checks whether it is considered a 'known'
-    /// package
-    ///
-    /// A package is considered [Known] when it has no git remotes
-    ///
-    /// # Examples
-    /// ```rust
-    /// use std::env::temp_dir;
-    /// use git2::Repository;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    /// let repo = Repository::init(&path);
-    /// let mut registry = Registry::initialize();
-    ///
-    /// assert!(repo.is_ok());
-    /// assert!(path.is_dir());
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(registry.is_known(&path));
-    /// ```
-    pub fn is_known<P: AsRef<Path>>(&self, local_location: P) -> bool {
-        if let Some(package) = self.find_by_local_location(local_location) {
-            return package.registration_status == Known;
-        }
-        panic!()
+    pub fn search_by_module_identifiers(&self, module_identifiers: &[String]) -> Vec<&Package> {
+        self.packages.iter().filter(|p|p.has_modules_with_identifiers(module_identifiers)).collect()
     }
 
-    /// Searches the given [Path] for a package and checks whether it is contained in the [Registry]
+    /// Checks if the [`Registry`] contains a certain [`Package`]
     ///
-    /// Criteria for being detected as a package are:
-    /// - Being in a git repository
-    pub fn contains<P: AsRef<Path>>(&self, local_location: P) -> bool {
-        self.find_by_local_location(local_location).is_some()
+    /// # Arguments
+    /// * `package` - A reference to a [`Package`] that needs to be checked
+    pub fn contains(&self, package: &Package) -> bool {
+        self.packages.contains(package)
     }
 
-    /// Check whether the number of packages in the [Registry] is 0
+    /// Returns how many [`Package`]s are in the [`Registry`]
+    pub fn count_packages(&self) -> usize {
+        self.packages.len()
+    }
+
+    /// Check whether the number of packages in the [`Registry`] is 0
     pub fn is_empty(&self) -> bool {
         self.packages.is_empty()
     }
 
-    /// Serializes the [Registry] to a JSON file located at the given [Path]
+    /// Adds a [`Package`] to the [`Registry`] and saves the [`Registry`]
+    ///
+    /// # Arguments
+    /// * `package` - A [`Package`] that needs to be added
     ///
     /// # Examples
     /// ```
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
+    /// # use std::env;
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("registry.json");
-    ///
-    /// registry.save(&path);
-    ///
-    /// assert!(path.exists());
-    /// assert_eq!(registry, Registry::load(path));
+    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    /// let package = Package::create(&package_path);
+    /// assert!(registry.is_empty());
+    /// registry.add(package.clone());
+    /// assert!(registry.contains(&package));
     /// ```
-    ///
-    /// This overwrites the file located at [Path]
-    ///
-    /// # Panics
-    /// Panics when [Path] does not point to a JSON file
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("registry.txt");
-    /// let registry = Registry::initialize();
-    ///
-    /// registry.save(&path);
+    /// Adding the same [`Package`] twice does not create duplicate entries
     /// ```
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
+    /// # use std::env;
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut path = temp_dir();
-    /// path.push("registry");
-    /// let registry = Registry::initialize();
+    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    /// # assert!(package_path.is_dir());
+    /// let package = Package::create(package_path);
     ///
-    /// registry.save(&path);
+    /// assert!(registry.is_empty());
+    ///
+    /// registry.add(package.clone());
+    ///
+    /// assert!(registry.contains(&package));
+    /// assert_eq!(registry.count_packages(), 1);
+    ///
+    /// registry.add(package.clone());
+    ///
+    /// assert!(registry.contains(&package));
+    /// assert_eq!(registry.count_packages(), 1);
     /// ```
+    pub fn add(&mut self, package: Package) {
+        self.packages.insert(package);
+        self.save().unwrap();
+    }
+
+    /// Removes a [`Package`] from the [`Registry`] and saves the [`Registry`]
     ///
-    /// Panics when path is relative
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
+    /// # Arguments
+    /// * `package` - A reference to a [`Package`] that needs to removed
     ///
-    /// let registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("dir");
-    /// path.push("..");
-    /// path.push("nonexistent.json");
-    ///
-    /// assert!(path.exists());
-    /// assert!(path.is_relative());
-    ///
-    /// registry.save(path);
+    /// # Examples
     /// ```
-    pub fn save<P: AsRef<Path>>(&self, path: P) {
-        if let Some(ext) = path.as_ref().extension() {
-            if ext != "json" {
-                panic!("Path does not point to a JSON file @ {}", path.as_ref().display());
-            }
-        } else {
-            panic!("Path does not point to a JSON file @ {}", path.as_ref().display());
+    /// # use std::{env, fs};
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
+    ///
+    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    ///
+    /// assert!(package_path.exists());
+    ///
+    /// let package = Package::create(package_path);
+    /// registry.add(package.clone());
+    ///
+    /// assert!(registry.contains(&package));
+    ///
+    /// registry.remove(&package);
+    ///
+    /// assert!(registry.is_empty());
+    /// ```
+    /// If the [`Registry`] does not contain the [`Package`] referenced, it does nothing.
+    /// ```
+    /// # use std::env;
+    /// # use git2::Repository;
+    /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::Registry;
+    ///
+    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json"));
+    /// let package_path = env::temp_dir().join("mock_package_known");
+    /// Repository::init(&package_path);
+    ///
+    /// assert!(package_path.is_dir());
+    /// assert!(registry.is_empty());
+    ///
+    /// let package = Package::create(package_path);
+    /// registry.remove(&package);
+    ///
+    /// assert!(registry.is_empty());
+    /// ```
+    pub fn remove(&mut self, package: &Package) {
+        self.packages.remove(package);
+        self.save().unwrap();
+    }
+
+    /// Serializes the [`Registry`] to a JSON file located at the [`Registry`]'s `location`
+    /// This overwrites the file located at that location
+    pub(crate) fn save(&self) -> Result<(), &str> {
+        let path = self.location.to_path_buf();
+
+        if path.is_relative() {
+            return Err("Path is relative")
         }
 
-        if path.as_ref().is_relative() {
-            panic!("Path is relative");
+        if let Some(ext) = path.extension() {
+            if ext != "json" {
+                return Err("Path does not point to a JSON file")
+            }
+        } else {
+            return Err("Path does not point to a file")
         }
 
         let contents = serde_json::to_string(self).unwrap();
 
-        write(path, contents).unwrap()
+        write(path, contents).unwrap();
+        Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+    use std::{env, fs};
+    use std::path::PathBuf;
+    use crate::registry::Registry;
+
+    #[test]
+    fn test_save() {
+        let path = env::temp_dir().join("registry.json");
+
+        let res = fs::remove_file(&path);
+
+        assert!(res.is_ok());
+
+        let registry = Registry {
+            location: path,
+            packages: HashSet::new(),
+        };
+        assert!(registry.save().is_ok());
     }
 
-    /// Searches the given [Path] for a package and adds it to the [Registry]
-    ///
-    /// Criteria for being detected as a package are:
-    /// - Being in a git repository
-    ///
-    /// # Examples
-    /// ```rust
-    /// use std::env::temp_dir;
-    /// use git2::Repository;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    /// let mut registry = Registry::initialize();
-    /// let repo = Repository::init(&path);
-    ///
-    /// assert!(repo.is_ok());
-    /// assert!(path.is_dir());
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(registry.contains(&path));
-    /// ```
-    ///
-    /// # Panics
-    /// Panics when the discovered package already exists.
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    ///
-    /// assert!(path.is_dir());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(registry.contains(&path));
-    ///
-    /// registry.add(&path);
-    /// ```
-    pub fn add<P: AsRef<Path>>(&mut self, path: P) {
-        let local_repository_root = infer_working_directory(path);
+    #[test]
+    /// When [`Registry`]'s `location` points to an existing file, overwrite it.
+    fn test_save_overwrite() {
+        let path = env::temp_dir().join("registry.json");
+        let res = fs::write(&path, "hello");
 
-        if self.contains(&local_repository_root) {
-            panic!()
-        }
+        assert!(res.is_ok());
+        assert!(path.is_file());
 
-        let repository = discover_git_repository(&local_repository_root);
-        let package = create_package(local_repository_root, repository);
+        let registry = Registry {
+            location: path,
+            packages: HashSet::new(),
+        };
 
-        self.packages.push(package);
+        assert!(registry.save().is_ok());
     }
 
-    /// Adds a [Dependency] to the package located at given [Path]
-    ///
-    /// If not manifest file named 'dependencies.json' is found one is created.
-    ///
-    /// # Examples
-    /// ```
-    /// use std::env::temp_dir;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    ///
-    /// assert!(path.is_dir());
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(!registry.is_empty());
-    ///
-    /// registry.add_dependency(&path, url);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics when given [Path] does not point to a valid package
-    /// ```rust, should_panic
-    /// use std::env::temp_dir;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let path = temp_dir();
-    /// let registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    ///
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.add_dependency(path, url);
-    /// ```
-    pub fn add_dependency<P: AsRef<Path>>(&self, local_location: P, url: Url) {
-        if let Some(package) = self.find_by_local_location(&local_location) {
-            package.add_dependency(url);
-            return;
-        }
-        panic!("No package found @ {}", local_location.as_ref().display());
+    #[test]
+    /// Should panic when [`Registry`]´s `location` does not point to a JSON file
+    fn test_save_panic_not_json() {
+        let path = env::temp_dir().join("registry.txt");
+
+        fs::write(&path, "test").unwrap();
+
+        assert!(path.exists());
+
+        let registry = Registry {
+            location: path,
+            packages: HashSet::new(),
+        };
+        assert_eq!(registry.save().err(), Some("Path does not point to a JSON file"));
     }
 
-    // Returns a list of all [Dependency] items required by the package at given [Path]
-    // Returns an empty list if no manifest file called 'dependencies.json' was found.
-    //
-    // # Panics
-    // Panics when given [Path] does not point to a valid package
-    // ```rust, should_panic
-    // use std::env::temp_dir;
-    // use url::Url;
-    // use knapsac_lib::registry::Registry;
-    //
-    // let path = temp_dir();
-    // let registry = Registry::initialize();
-    // let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    //
-    // assert!(registry.is_empty());
-    //
-    // registry.get_dependencies(path);
-    // ```
+    #[test]
+    /// Should panic when [`Registry`]´s `location` points to a directory
+    fn test_save_panic_is_a_file() {
+        let path = env::temp_dir().join("registry");
 
-    // pub fn get_dependencies<P: AsRef<Path>>(&self, local_location: P) -> Vec<Dependency> {
-    //     if let Some(package) = self.find_by_local_location(&local_location) {
-    //         return package.get_dependencies()
-    //     }
-    //     panic!("No package found @ {}", local_location.as_ref().display());
-    // }
+        fs::create_dir_all(&path).unwrap();
 
-    /// Removes a [Dependency] from the package at given [Path]
-    ///
-    /// # Panics
-    /// Panics when given [Path] does not point to a valid package
-    /// ```rust, should_panic
-    /// use std::env::temp_dir;
-    /// use url::Url;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let path = temp_dir();
-    /// let registry = Registry::initialize();
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    ///
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.remove_dependency(path, url);
-    /// ```
-    pub fn remove_dependency<P: AsRef<Path>>(&self, local_location: P, value: Url) {
-        if let Some(package) = self.find_by_local_location(&local_location) {
-            package.remove_dependency(value);
-            return;
-        }
-        panic!("No package found @ {}", local_location.as_ref().display());
+        assert!(path.is_dir());
+
+        let registry = Registry {
+            location: path,
+            packages: HashSet::new(),
+        };
+        let res = registry.save();
+        assert_eq!(res.err(), Some("Path does not point to a file"));
     }
 
-    /// Searches the given [Path] for a package and removes it from the [Registry]
-    /// Criteria for being detected as a package are:
-    /// - Being in a git repository
-    ///
-    /// # Examples
-    /// ```
-    /// use std::env::temp_dir;
-    /// use std::fs::create_dir_all;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    ///
-    /// create_dir_all(&path);
-    ///
-    /// assert!(path.is_dir());
-    ///
-    /// registry.add(&path);
-    ///
-    /// assert!(registry.contains(&path));
-    ///
-    /// registry.remove(&path);
-    ///
-    /// assert!(registry.is_empty());
-    /// ```
-    ///
-    /// If the registry does not contain the package found it does nothing.
-    /// ```
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let mut registry = Registry::initialize();
-    /// let mut path = temp_dir();
-    /// path.push("mock_packages_known");
-    ///
-    /// assert!(path.is_dir());
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.remove(&path);
-    ///
-    /// assert!(registry.is_empty());
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if the given [Path] does not point to a valid git repository
-    /// ```rust,should_panic
-    /// use std::env::temp_dir;
-    /// use knapsac_lib::registry::Registry;
-    ///
-    /// let path = temp_dir();
-    /// let mut registry = Registry::initialize();
-    ///
-    /// assert!(registry.is_empty());
-    ///
-    /// registry.remove(&path);
-    /// ```
-    pub fn remove<P: AsRef<Path>>(&mut self, local_location: P) {
-        let local_repository_root = infer_working_directory(local_location);
-        self.packages
-            .retain(|p| p.local_location != local_repository_root);
+    #[test]
+    /// Should panic when [`Registry`]'s `location` is a relative [`Path`]
+    fn test_save_panic_is_relative() {
+        let path = PathBuf::from("./registry.json");
+
+        let registry = Registry {
+            location: path,
+            packages: HashSet::new(),
+        };
+        assert_eq!(registry.save().err(), Some("Path is relative"));
     }
 }

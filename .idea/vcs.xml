@@ -2,7 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/test_data/mock_package_known" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/test_data/mock_package_registered" vcs="Git" />
   </component>
 </project>
