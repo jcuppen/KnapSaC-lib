@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 pub mod package_module;
 pub mod standalone_module;
+mod manifest;
 
 pub trait Module {
     fn prepare<P: AsRef<Path>>(path: P, identifier: Option<String>) -> (String, PathBuf) {

@@ -1,9 +1,6 @@
 use crate::dependency::PackageDependency;
-use crate::error::PackageError::{
-    DownloadFailed, NoRemoteLocation, NotARepository,
-    PackageRootNotADirectory,
-};
-use crate::error::{FailedToLoadManifestError, ManifestError, PackageError, RepositoryError};
+use crate::error::PackageError::{DownloadFailed, InvalidManifest, NoRemoteLocation, NotARepository, PackageRootNotADirectory};
+use crate::error::{ManifestError, PackageError, RepositoryError};
 use crate::manifest::Manifest;
 use crate::module::package_module::PackageModule;
 use crate::module::standalone_module::StandaloneModule;
@@ -88,8 +85,6 @@ impl Package {
             remote_location: Url::parse(remote.url().unwrap()).unwrap(),
         };
 
-        Manifest::initialize().save(package.manifest_location());
-
         Ok(package)
     }
 
@@ -156,11 +151,11 @@ impl Package {
         self.local_location.clone()
     }
 
-    fn load_manifest(&self) -> Result<Manifest, FailedToLoadManifestError> {
+    fn load_manifest(&self) -> Result<Manifest, PackageError> {
         match Manifest::load(self.manifest_location()) {
             Ok(m) => Ok(m),
             Err(e) => match e {
-                ManifestError::NoManifestFound => Err(FailedToLoadManifestError),
+                ManifestError::InvalidManifest => Err(InvalidManifest)
             },
         }
     }
@@ -223,7 +218,7 @@ impl Package {
     pub fn add_package_dependency(
         &self,
         dependency: PackageDependency,
-    ) -> Result<(), FailedToLoadManifestError> {
+    ) -> Result<(), PackageError> {
         let mut manifest = self.load_manifest()?;
         manifest.add_package_dependency(dependency);
         manifest.save(self.manifest_location());
@@ -239,7 +234,7 @@ impl Package {
     pub fn has_package_dependency(
         &self,
         dependency: &PackageDependency,
-    ) -> Result<bool, FailedToLoadManifestError> {
+    ) -> Result<bool, PackageError> {
         Ok(self.load_manifest()?.has_package_dependency(dependency))
     }
 
@@ -270,7 +265,7 @@ impl Package {
     pub fn remove_package_dependency(
         &self,
         dependency: &PackageDependency,
-    ) -> Result<(), FailedToLoadManifestError> {
+    ) -> Result<(), PackageError> {
         let mut manifest = self.load_manifest()?;
         manifest.remove_package_dependency(dependency);
         manifest.save(self.manifest_location());
@@ -299,10 +294,9 @@ impl Package {
     /// package.add_module_dependency(module.clone());
     /// assert!(package.has_module_dependency(&module).unwrap());
     /// ```
-    pub fn add_module_dependency(&self, dependency: StandaloneModule) -> Result<(), FailedToLoadManifestError> {
+    pub fn add_module_dependency(&self, dependency: StandaloneModule) -> Result<(), PackageError> {
         let mut manifest = self.load_manifest()?;
         manifest.add_module_dependency(dependency);
-        manifest.save(self.manifest_location());
         Ok(())
     }
 
@@ -313,7 +307,7 @@ impl Package {
     pub fn has_module_dependency(
         &self,
         dependency: &StandaloneModule,
-    ) -> Result<bool, FailedToLoadManifestError> {
+    ) -> Result<bool, PackageError> {
         Ok(self.load_manifest()?.has_module_dependency(dependency))
     }
 
@@ -321,7 +315,7 @@ impl Package {
     pub fn remove_module_dependency(
         &self,
         dependency: &StandaloneModule,
-    ) -> Result<(), FailedToLoadManifestError> {
+    ) -> Result<(), PackageError> {
         self.load_manifest()?.remove_module_dependency(dependency);
         Ok(())
     }
@@ -347,7 +341,7 @@ impl Package {
     /// package.add_module(module.clone());
     /// assert!(package.has_module(&module).unwrap());
     /// ```
-    pub fn add_module(&self, module: PackageModule) -> Result<(), FailedToLoadManifestError> {
+    pub fn add_module(&self, module: PackageModule) -> Result<(), PackageError> {
         let mut manifest = self.load_manifest()?;
         manifest.add_module(module);
         manifest.save(self.manifest_location());
@@ -368,11 +362,11 @@ impl Package {
     pub fn get_module_by_location<P: AsRef<Path>>(
         &self,
         location: P,
-    ) -> Result<Option<PackageModule>, FailedToLoadManifestError> {
+    ) -> Result<Option<PackageModule>, PackageError> {
         Ok(self
             .load_manifest()?
-            .get_module_by_location(location).cloned()
-        )
+            .get_module_by_location(location)
+            .cloned())
     }
 
     /// Checks the [`Package`] if it provides a given [`Module`]
@@ -382,7 +376,7 @@ impl Package {
     ///
     /// # Examples
     /// TODO write docs
-    pub fn has_module(&self, module: &PackageModule) -> Result<bool, FailedToLoadManifestError> {
+    pub fn has_module(&self, module: &PackageModule) -> Result<bool, PackageError> {
         Ok(self.load_manifest()?.modules.contains(module))
     }
 
@@ -394,7 +388,7 @@ impl Package {
     pub(crate) fn has_modules_with_identifiers(
         &self,
         identifiers: &[String],
-    ) -> Result<bool, FailedToLoadManifestError> {
+    ) -> Result<bool, PackageError> {
         Ok(self
             .load_manifest()?
             .modules
@@ -425,7 +419,7 @@ impl Package {
     /// package.remove_module(&module);
     /// assert!(!package.has_module(&module).unwrap());
     /// ```
-    pub fn remove_module(&self, module: &PackageModule) -> Result<(), FailedToLoadManifestError> {
+    pub fn remove_module(&self, module: &PackageModule) -> Result<(), PackageError> {
         let mut manifest = self.load_manifest()?;
         manifest.remove_module(module);
         manifest.save(self.manifest_location());

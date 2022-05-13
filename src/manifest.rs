@@ -1,23 +1,25 @@
 use crate::dependency::PackageDependency;
+use crate::error::ManifestError;
+use crate::error::ManifestError::{InvalidManifest};
 use crate::module::package_module::PackageModule;
 use crate::module::standalone_module::StandaloneModule;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{read_to_string, write};
-use std::path::Path;
-use crate::error::ManifestError;
-use crate::error::ManifestError::NoManifestFound;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize, Serialize, Clone)]
 pub(crate) struct Manifest {
+    location: PathBuf,
     pub(crate) package_dependencies: HashSet<PackageDependency>,
     pub(crate) module_dependencies: HashSet<StandaloneModule>,
     pub(crate) modules: HashSet<PackageModule>,
 }
 
 impl Manifest {
-    pub(crate) fn initialize() -> Manifest {
+    pub(crate) fn initialize<P: AsRef<Path>>(path: P) -> Manifest {
         Manifest {
+            location: path.as_ref().to_path_buf(),
             package_dependencies: HashSet::new(),
             module_dependencies: HashSet::new(),
             modules: HashSet::new(),
@@ -25,9 +27,15 @@ impl Manifest {
     }
     pub(crate) fn load<P: AsRef<Path>>(path: P) -> Result<Self, ManifestError> {
         if let Ok(data) = read_to_string(&path) {
-            return Ok(serde_json::from_str(data.as_str()).unwrap());
+            let res = serde_json::from_str(data.as_str());
+            if res.is_err() {
+                return Err(InvalidManifest);
+            }
+            let mut manifest: Manifest = res.unwrap();
+            manifest.location = path.as_ref().to_path_buf();
+            return Ok(manifest);
         }
-        Err(NoManifestFound)
+        Ok(Self::initialize(path))
     }
     pub(crate) fn save<P: AsRef<Path>>(&self, path: P) {
         let contents = serde_json::to_string(self).unwrap();

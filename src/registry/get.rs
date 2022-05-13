@@ -1,12 +1,12 @@
 use crate::error::{NotAPackageError, RepositoryError};
+use crate::module::standalone_module::StandaloneModule;
 use crate::package::Package;
 use crate::registry::Registry;
 use crate::utils::infer_working_directory;
 use std::path::{Path, PathBuf};
-use crate::module::standalone_module::StandaloneModule;
 
 pub enum FindBy {
-    LocalLocation(PathBuf),
+    Location(PathBuf),
 }
 
 impl Registry {
@@ -29,14 +29,14 @@ impl Registry {
             Err(e) => match e {
                 RepositoryError::BareRepository => Err(NotAPackageError),
                 RepositoryError::RepositoryDiscoveryFailed => Err(NotAPackageError),
-            }
+            },
         }
     }
 
     //TODO: document
     pub fn get_package(&self, find_by: FindBy) -> Result<Option<&Package>, NotAPackageError> {
         match find_by {
-            FindBy::LocalLocation(path) => self.get_package_by_local_location(path),
+            FindBy::Location(path) => self.get_package_by_local_location(path),
         }
     }
 
@@ -44,30 +44,30 @@ impl Registry {
     ///
     /// # Arguments
     /// * `location` - [`Path`] pointing to a location for which a [`StandaloneModule`] should be registered.
-    fn get_module_by_location<P: AsRef<Path>>(
-        &self,
-        location: P,
-    ) -> Option<StandaloneModule> {
-        self.modules.iter().find(|m|m.location == location.as_ref().to_path_buf()).cloned()
+    fn get_module_by_location<P: AsRef<Path>>(&self, location: P) -> Option<StandaloneModule> {
+        self.modules
+            .iter()
+            .find(|m| m.location == location.as_ref().to_path_buf())
+            .cloned()
     }
 
     //TODO: document
     pub fn get_module(&self, find_by: FindBy) -> Option<StandaloneModule> {
         match find_by {
-            FindBy::LocalLocation(path) => self.get_module_by_location(path),
+            FindBy::Location(path) => self.get_module_by_location(path),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::error::NotAPackageError;
     use crate::package::Package;
     use crate::registry::Registry;
     use git2::Repository;
     use std::collections::HashSet;
     use std::env;
     use url::Url;
-    use crate::error::NotAPackageError;
 
     #[test]
     fn test_get_package_by_local_location() {

@@ -1,14 +1,14 @@
-pub mod get;
 mod add;
+pub mod get;
 mod remove;
 
-use crate::package::Package;
 use crate::error::RegistryError;
 use crate::error::RegistryError::{
     InvalidRegistry, NoRegistryFound, RegistryPathNotAbsolute, RegistryPathNotFile,
     RegistryPathNotJSON,
 };
 use crate::module::standalone_module::StandaloneModule;
+use crate::package::Package;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{read_to_string, write};
@@ -115,17 +115,17 @@ impl Registry {
     }
 
     // TODO write docs
-    pub fn search_by_module_identifiers(&self, module_identifiers: &[String]) -> Vec<&Package> {
-        self.packages
-            .iter()
-            .filter(|p| {
-                match p.has_modules_with_identifiers(module_identifiers) {
-                    Ok(b) => b,
-                    Err(_e) => panic!("Failed to load package manifest.")
-                }
-            })
-            .collect()
-    }
+    // pub fn search_by_module_identifiers(&self, module_identifiers: &[String]) -> Vec<&Package> {
+    //     self.packages
+    //         .iter()
+    //         .filter(
+    //             |p| match p.has_modules_with_identifiers(module_identifiers) {
+    //                 Ok(b) => b,
+    //                 Err(_e) => panic!("Failed to load package manifest."),
+    //             },
+    //         )
+    //         .collect()
+    // }
 
     /// Checks if the [`Registry`] contains a certain [`Package`]
     ///

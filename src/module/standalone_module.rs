@@ -1,9 +1,12 @@
-use crate::error::ModuleError;
-use crate::error::ModuleError::DoesNotExist;
+use std::ffi::OsStr;
+use crate::error::{ManifestError, ModuleError};
+use crate::error::ModuleError::{CyclicDependency, DoesNotExist, InvalidManifest};
 use crate::error::ModuleError::LocationNotAbsolute;
 use crate::module::Module;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use crate::module::manifest::Manifest;
+use crate::registry::Registry;
 
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct StandaloneModule {
@@ -12,6 +15,24 @@ pub struct StandaloneModule {
 }
 
 impl StandaloneModule {
+    fn load_manifest(&self) -> Result<Manifest, ModuleError> {
+        match Manifest::load(self.manifest_location()?) {
+            Ok(m) => Ok(m),
+            Err(e) => match e {
+                ManifestError::InvalidManifest => Err(InvalidManifest)
+            },
+        }
+    }
+
+    fn manifest_location(&self) -> Result<PathBuf, ModuleError> {
+        let mut path: PathBuf = self.location.clone();
+        let file_stem = path.file_stem().unwrap_or_else(||panic!("Module location does not point to a file")).to_os_string();
+        path = PathBuf::from(path.parent().unwrap_or_else(|| panic!("Module location does not have a parent directory")));
+        path.push(file_stem);
+        path.set_extension("knapsac");
+        Ok(path)
+    }
+
     /// Creates a new [`StandaloneModule`] based on the given [`Path`]
     ///
     /// # Arguments
@@ -72,6 +93,49 @@ impl StandaloneModule {
             // identifier,
             location: path,
         })
+    }
+
+    /// Adds a [`ModuleDependency`] to a [`StandAloneModule`]
+    ///
+    /// # Arguments
+    /// * `dependency` - A [`StandaloneModule`] that needs to be added
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::{env, fs};
+    /// # use git2::Repository;
+    /// # use url::Url;
+    /// # use knapsac_lib::module::standalone_module::StandaloneModule;
+    /// # use knapsac_lib::package::Package;
+    ///
+    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
+    /// let package = Package::download(url, env::temp_dir()).unwrap();
+    ///
+    /// let module_path = env::temp_dir().join("a.sac");
+    /// # fs::write(&module_path, "hello");
+    /// let module = StandaloneModule::create(&module_path).unwrap();
+    /// package.add_module_dependency(module.clone());
+    /// assert!(package.has_module_dependency(&module).unwrap());
+    /// ```
+    pub fn add_module_dependency(&self, dependency: StandaloneModule) -> Result<(), ModuleError> {
+        let mut manifest = self.load_manifest()?;
+        if dependency.dependency_tree_contains_module(self)? {
+            return Err(CyclicDependency)
+        }
+        manifest.add_module_dependency(dependency);
+        Ok(())
+    }
+
+    fn dependency_tree_contains_module(&self, module: &StandaloneModule) -> Result<bool, ModuleError> {
+        if module.location == self.location {
+            return Ok(true);
+        }
+        for d in self.load_manifest()?.module_dependencies {
+            if d.dependency_tree_contains_module(module)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 

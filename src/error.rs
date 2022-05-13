@@ -1,6 +1,3 @@
-#[derive(Debug)]
-pub struct FailedToLoadManifestError;
-
 #[derive(Debug, PartialEq)]
 pub struct NotAPackageError;
 
@@ -16,6 +13,7 @@ pub enum PackageError {
     NotARepository,
     PackageRootNotADirectory,
     DownloadFailed,
+    InvalidManifest,
 }
 
 #[derive(Debug, PartialEq)]
@@ -32,6 +30,8 @@ pub enum ModuleError {
     LocationNotRelative,
     LocationNotAbsolute,
     DoesNotExist,
+    InvalidManifest,
+    CyclicDependency,
 }
 
 #[derive(Debug)]
@@ -42,5 +42,5 @@ pub enum DependencyError {
 }
 
 pub(crate) enum ManifestError {
-    NoManifestFound,
+    InvalidManifest,
 }
