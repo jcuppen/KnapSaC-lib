@@ -1,21 +1,14 @@
+use crate::error::RepositoryError;
+use crate::error::RepositoryError::{BareRepository, RepositoryDiscoveryFailed};
 use git2::Repository;
 use std::path::{Path, PathBuf};
 
-pub(crate) fn discover_git_repository<P: AsRef<Path>>(path: P) -> Repository {
-    match Repository::discover(&path) {
-        Ok(r) => r,
-        Err(_) => {
-            panic!("Failed to discover repository @ {}", path.as_ref().display());
-        }
+pub(crate) fn infer_working_directory<P: AsRef<Path>>(path: P) -> Result<PathBuf, RepositoryError> {
+    if let Ok(repository) = Repository::discover(&path) {
+        return match repository.workdir() {
+            None => Err(BareRepository),
+            Some(p) => Ok(p.to_path_buf().canonicalize().unwrap()),
+        };
     }
-}
-
-pub(crate) fn infer_working_directory<P: AsRef<Path>>(path: P) -> PathBuf {
-    discover_git_repository(&path)
-        .workdir()
-        .expect(&*format!(
-            "Failed to find root of local repository for path '{}'",
-            path.as_ref().display(),
-        ))
-        .to_path_buf()
+    Err(RepositoryDiscoveryFailed)
 }
