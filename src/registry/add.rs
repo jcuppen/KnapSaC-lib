@@ -1,9 +1,17 @@
 use crate::error::RegistryError;
+use crate::error::RegistryError::ModuleAlreadyInRegistry;
+// use crate::error::RegistryError::ModuleAlreadyInRegistry;
 use crate::module::standalone_module::StandaloneModule;
-use crate::package::Package;
 use crate::registry::Registry;
 
 impl Registry {
+    // Private Functions
+
+    // Crate Public Functions
+
+    // Public Functions
+
+    /*
     /// Adds a [`Package`] to the [`Registry`] and saves the [`Registry`]
     ///
     /// # Arguments
@@ -52,6 +60,7 @@ impl Registry {
         self.packages.insert(package);
         self.save()
     }
+    */
 
     /// Adds a [`StandaloneModule`] to the [`Registry`] and saves the [`Registry`]
     ///
@@ -63,45 +72,56 @@ impl Registry {
     /// # use std::{env, fs};
     /// # use git2::Repository;
     /// # use url::Url;
-    /// use knapsac_lib::module::standalone_module::StandaloneModule;
+    /// # use knapsac_lib::module::standalone_module::StandaloneModule;
     /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::get::FindBy;
     /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json")).unwrap();
-    /// let module_path = env::temp_dir().join("a.sac");
-    /// # fs::write(&module_path, "hello");
-    /// let module = StandaloneModule::create(module_path).unwrap();
+    /// let mut registry = Registry::initialize(&env::temp_dir().join("registry.json")).unwrap();
+    /// # let module_out_path = env::temp_dir().join("a");
+    /// # if !module_out_path.exists() { fs::create_dir_all(&module_out_path).unwrap()}
+    /// let module = StandaloneModule::create("a", &module_out_path).unwrap();
+    ///
     /// assert!(registry.is_empty());
-    /// registry.add_module(module.clone());
-    /// assert!(registry.contains_module(&module));
+    ///
+    /// registry.add_module(module.clone()).unwrap();
+    /// let found_module = registry.get_module(FindBy::OutputLocation(module_out_path)).unwrap().unwrap();
+    ///
+    /// assert_eq!(found_module, module);
     /// ```
-    /// Adding the same [`Package`] twice does not create duplicate entries
+    /// # Errors
+    /// Returns a [`ModuleAlreadyInRegistry`] error when a module is being added where the path matches an already registered [`StandaloneModule`]
     /// ```
-    /// # use std::env;
+    /// # use std::{env, fs};
     /// # use git2::Repository;
     /// # use url::Url;
-    /// use knapsac_lib::module::standalone_module::StandaloneModule;
+    /// # use knapsac_lib::error::RegistryError::ModuleAlreadyInRegistry;
+    /// # use knapsac_lib::module::standalone_module::StandaloneModule;
     /// # use knapsac_lib::package::Package;
+    /// # use knapsac_lib::registry::get::FindBy;
     /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json")).unwrap();
-    /// let module_path = env::temp_dir().join("a.sac");
-    /// let module = StandaloneModule::create(module_path).unwrap();
-    ///
+    /// let mut registry = Registry::initialize(&env::temp_dir().join("registry.json")).unwrap();
+    /// # let module_out_path = env::temp_dir().join("a");
+    /// # if !module_out_path.exists() { fs::create_dir_all(&module_out_path).unwrap()}
+    /// let module = StandaloneModule::create("a", &module_out_path).unwrap();
+    /// let other_module = StandaloneModule::create("a", &module_out_path).unwrap();
     /// assert!(registry.is_empty());
     ///
-    /// registry.add_module(module.clone());
+    /// registry.add_module(module.clone()).unwrap();
+    /// let found_module = registry.get_module(FindBy::OutputLocation(module_out_path)).unwrap().unwrap();
     ///
-    /// assert!(registry.contains_module(&module));
-    /// assert_eq!(registry.count_modules(), 1);
+    /// assert_eq!(found_module, module);
     ///
-    /// registry.add_module(module.clone());
+    /// let err = registry.add_module(other_module).unwrap_err();
     ///
-    /// assert!(registry.contains_module(&module));
-    /// assert_eq!(registry.count_modules(), 1);
+    /// assert_eq!(err, ModuleAlreadyInRegistry);
     /// ```
     pub fn add_module(&mut self, module: StandaloneModule) -> Result<(), RegistryError> {
-        self.modules.insert(module);
+        if self.modules.iter().any(|(i, _)| i == &module.identifier) {
+            return Err(ModuleAlreadyInRegistry);
+        }
+        self.modules.insert(module.identifier.clone(), module);
         self.save()
     }
 }

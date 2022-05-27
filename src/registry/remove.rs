@@ -1,9 +1,9 @@
 use crate::error::RegistryError;
 use crate::module::standalone_module::StandaloneModule;
-use crate::package::Package;
 use crate::registry::Registry;
 
 impl Registry {
+    /*
     /// Removes a [`Package`] from the [`Registry`] and saves the [`Registry`]
     ///
     /// # Arguments
@@ -45,6 +45,7 @@ impl Registry {
         self.packages.remove(package);
         self.save()
     }
+     */
 
     /// Removes a [`StandaloneModule`] from the [`Registry`] and saves the [`Registry`]
     ///
@@ -55,15 +56,21 @@ impl Registry {
     /// ```
     /// # use std::{env, fs};
     /// # use knapsac_lib::module::standalone_module::StandaloneModule;
+    /// use knapsac_lib::registry::get::FindBy;
     /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json")).unwrap();
+    /// let mut registry = Registry::initialize(&env::temp_dir().join("registry.json")).unwrap();
+    /// let module_out_path = env::temp_dir().join("a");
+    /// let module = StandaloneModule::create("a", &module_out_path).unwrap();
+    ///
     /// assert!(registry.is_empty());
-    /// let module_path = env::temp_dir().join("a.sac");
-    /// let module = StandaloneModule::create(module_path).unwrap();
-    /// registry.add_module(module.clone());
-    /// assert!(registry.contains_module(&module));
-    /// registry.remove_module(&module);
+    ///
+    /// registry.add_module(module.clone()).unwrap();
+    /// let found_module = registry.get_module(FindBy::OutputLocation(module_out_path)).unwrap().unwrap();
+    ///
+    /// assert_eq!(found_module, module);
+    ///
+    /// registry.remove_module(&module).unwrap();
     /// assert!(registry.is_empty());
     /// ```
     /// If the [`Registry`] does not contain the [`StandaloneModule`] referenced, it does nothing.
@@ -72,15 +79,19 @@ impl Registry {
     /// # use knapsac_lib::module::standalone_module::StandaloneModule;
     /// # use knapsac_lib::registry::Registry;
     ///
-    /// let mut registry = Registry::initialize(env::temp_dir().join("registry.json")).unwrap();
+    /// let mut registry = Registry::initialize(&env::temp_dir().join("registry.json")).unwrap();
+    ///
+    /// let module_out_path = env::temp_dir().join("a");
+    /// let module = StandaloneModule::create("a", &module_out_path).unwrap();
+    ///
     /// assert!(registry.is_empty());
-    /// let module_path = env::temp_dir().join("a.sac");
-    /// let module = StandaloneModule::create(module_path).unwrap();
-    /// registry.remove_module(&module);
+    ///
+    /// registry.remove_module(&module).unwrap();
+    ///
     /// assert!(registry.is_empty());
     /// ```
     pub fn remove_module(&mut self, module: &StandaloneModule) -> Result<(), RegistryError> {
-        self.modules.remove(module);
+        self.modules.remove(&module.identifier);
         self.save()
     }
 }

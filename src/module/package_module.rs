@@ -1,10 +1,7 @@
-use crate::error::ModuleError;
-use crate::error::ModuleError::{DoesNotExist, LocationNotRelative};
 use crate::module::Module;
-use crate::package::Package;
 use serde::Deserialize;
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 #[derive(Clone, Eq, Hash, PartialEq, Deserialize, Serialize, Debug)]
 pub struct PackageModule {
@@ -13,7 +10,7 @@ pub struct PackageModule {
 }
 
 impl Module for PackageModule {}
-
+/*
 impl PackageModule {
     pub fn get_identifier(&self) -> String {
         self.identifier.clone()
@@ -89,7 +86,7 @@ impl PackageModule {
     pub fn create<P: AsRef<Path>>(
         path: P,
         id: Option<String>,
-        package: &Package,
+        // package: &Package,
     ) -> Result<Self, ModuleError> {
         let (identifier, path) = PackageModule::prepare(path, id);
         if path.is_absolute() {
@@ -104,3 +101,4 @@ impl PackageModule {
         })
     }
 }
+*/

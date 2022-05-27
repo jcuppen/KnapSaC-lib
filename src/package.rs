@@ -1,9 +1,9 @@
-use crate::dependency::PackageDependency;
-use crate::error::PackageError::{DownloadFailed, InvalidManifest, NoRemoteLocation, NotARepository, PackageRootNotADirectory};
-use crate::error::{ManifestError, PackageError, RepositoryError};
-use crate::manifest::Manifest;
-use crate::module::package_module::PackageModule;
-use crate::module::standalone_module::StandaloneModule;
+// use crate::dependency::PackageDependency;
+use crate::error::PackageError::{
+    DownloadFailed, NoRemoteLocation, NotARepository, PackageRootNotADirectory,
+};
+use crate::error::{PackageError, RepositoryError};
+
 use crate::utils::infer_working_directory;
 use git2::Repository;
 use nanoid::nanoid;
@@ -146,27 +146,28 @@ impl Package {
         }
         Package::create(repository_path)
     }
-
+/*
     pub fn get_local_location(&self) -> PathBuf {
         self.local_location.clone()
     }
 
     fn load_manifest(&self) -> Result<Manifest, PackageError> {
-        match Manifest::load(self.manifest_location()) {
+        match Manifest::load(&self.manifest_location()) {
             Ok(m) => Ok(m),
             Err(e) => match e {
-                ManifestError::InvalidManifest => Err(InvalidManifest)
+                ManifestError::InvalidManifest => Err(InvalidManifest),
             },
         }
     }
 
     fn manifest_location(&self) -> PathBuf {
-        let mut path: PathBuf = self.get_local_location();
+        let mut path = self.get_local_location();
         path.push("manifest");
         path.set_extension("json");
         path
     }
-
+ */
+/*
     /// Strips the [`Package`]'s `local_location` from the given [`Path`]
     ///
     /// # Arguments
@@ -185,7 +186,7 @@ impl Package {
     /// let other_path = package.get_local_location().join("example.txt");
     /// fs::write(&other_path, "hello");
     /// assert!(&other_path.exists());
-    /// assert_eq!(package.strip_prefix(other_path), PathBuf::from("example.txt"))
+    /// assert_eq!(package.strip_prefix(&other_path), PathBuf::from("example.txt"))
     /// ```
     ///
     /// # Panics
@@ -203,228 +204,238 @@ impl Package {
     /// assert!(other_path.exists());
     /// package.strip_prefix(&other_path);
     /// ```
-    pub fn strip_prefix<P: AsRef<Path>>(&self, path: P) -> PathBuf {
-        let p = path.as_ref().canonicalize().unwrap();
-        p.strip_prefix(self.get_local_location())
+    pub fn strip_prefix<P: AsRef<Path>>(&self, path: &Path) -> PathBuf {
+        path.canonicalize()
+            .unwrap()
+            .strip_prefix(self.get_local_location())
             .unwrap()
             .to_path_buf()
     }
+    */
+    /*
+        /// TODO write docs
+        /// Adds a [`PackageDependency`] to a [`Package`]
+        ///
+        /// # Arguments
+        /// * `dependency` - A [`PackageDependency`] that needs to be added
+        pub fn add_package_dependency(
+            &self,
+            dependency: PackageDependency,
+        ) -> Result<(), PackageError> {
+            let mut manifest = self.load_manifest()?;
+            manifest.add_package_dependency(dependency);
+            manifest.save(self.manifest_location());
+            Ok(())
+        }
+    */
 
-    /// TODO write docs
-    /// Adds a [`PackageDependency`] to a [`Package`]
-    ///
-    /// # Arguments
-    /// * `dependency` - A [`PackageDependency`] that needs to be added
-    pub fn add_package_dependency(
-        &self,
-        dependency: PackageDependency,
-    ) -> Result<(), PackageError> {
-        let mut manifest = self.load_manifest()?;
-        manifest.add_package_dependency(dependency);
-        manifest.save(self.manifest_location());
-        Ok(())
-    }
+    /*
+        /// Checks the [`Package`] if it depends on the given [`PackageDependency`]
+        ///
+        /// TODO write docs
+        ///
+        /// # Arguments
+        /// * `dependency` - A reference to a [`PackageDependency`] that needs to be checked
+        pub fn has_package_dependency(
+            &self,
+            dependency: &PackageDependency,
+        ) -> Result<bool, PackageError> {
+            Ok(self.load_manifest()?.has_package_dependency(dependency))
+        }
+    */
 
-    /// Checks the [`Package`] if it depends on the given [`PackageDependency`]
-    ///
-    /// TODO write docs
-    ///
-    /// # Arguments
-    /// * `dependency` - A reference to a [`PackageDependency`] that needs to be checked
-    pub fn has_package_dependency(
-        &self,
-        dependency: &PackageDependency,
-    ) -> Result<bool, PackageError> {
-        Ok(self.load_manifest()?.has_package_dependency(dependency))
-    }
+    /*
+        /// Removes a [`PackageDependency`] from a [`Package`]
+        ///
+        /// # Arguments
+        /// * `dependency` - A reference to a [`PackageDependency`] that needs to be removed
+        ///
+        /// # Examples
+        /// ```
+        /// # use std::env;
+        /// # use git2::Repository;
+        /// # use url::Url;
+        /// # use knapsac_lib::dependency::PackageDependency;
+        /// # use knapsac_lib::package::Package;
+        ///
+        /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
+        /// let package = Package::download(url.clone(), env::temp_dir()).unwrap();
+        /// let dependency = PackageDependency::create(url.clone());
+        ///
+        /// package.add_package_dependency(dependency.clone());
+        /// assert!(package.has_package_dependency(&dependency).unwrap());
+        /// package.remove_package_dependency(&dependency);
+        /// assert!(!package.has_package_dependency(&dependency).unwrap())
+        /// ```
+        ///
+        /// TODO: disallow cyclic dependencies
+        pub fn remove_package_dependency(
+            &self,
+            dependency: &PackageDependency,
+        ) -> Result<(), PackageError> {
+            let mut manifest = self.load_manifest()?;
+            manifest.remove_package_dependency(dependency);
+            manifest.save(self.manifest_location());
+            Ok(())
+        }
+    */
+    /*
+       /// Adds a [`ModuleDependency`] to a [`Package`]
+       ///
+       /// # Arguments
+       /// * `dependency` - A [`ModuleDependency`] that needs to be added
+       ///
+       /// # Examples
+       /// ```
+       /// # use std::{env, fs};
+       /// # use git2::Repository;
+       /// # use url::Url;
+       /// # use knapsac_lib::module::standalone_module::StandaloneModule;
+       /// # use knapsac_lib::package::Package;
+       ///
+       /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
+       /// let package = Package::download(url, env::temp_dir()).unwrap();
+       ///
+       /// let module_path = env::temp_dir().join("a.sac");
+       /// # fs::write(&module_path, "hello");
+       /// let module = StandaloneModule::create(&module_path).unwrap();
+       /// package.add_module_dependency(module.clone());
+       /// println!("{:?}", module);
+       /// assert!(package.has_module_dependency(&module).unwrap());
+       /// ```
+       pub fn add_module_dependency(&self, dependency: StandaloneModule) -> Result<(), PackageError> {
+           let mut manifest = self.load_manifest()?;
+           manifest.add_module_dependency(dependency);
+           Ok(())
+       }
 
-    /// Removes a [`PackageDependency`] from a [`Package`]
-    ///
-    /// # Arguments
-    /// * `dependency` - A reference to a [`PackageDependency`] that needs to be removed
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::env;
-    /// # use git2::Repository;
-    /// # use url::Url;
-    /// # use knapsac_lib::dependency::PackageDependency;
-    /// # use knapsac_lib::package::Package;
-    ///
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let package = Package::download(url.clone(), env::temp_dir()).unwrap();
-    /// let dependency = PackageDependency::create(url.clone());
-    ///
-    /// package.add_package_dependency(dependency.clone());
-    /// assert!(package.has_package_dependency(&dependency).unwrap());
-    /// package.remove_package_dependency(&dependency);
-    /// assert!(!package.has_package_dependency(&dependency).unwrap())
-    /// ```
-    ///
-    /// TODO: disallow cyclic dependencies
-    pub fn remove_package_dependency(
-        &self,
-        dependency: &PackageDependency,
-    ) -> Result<(), PackageError> {
-        let mut manifest = self.load_manifest()?;
-        manifest.remove_package_dependency(dependency);
-        manifest.save(self.manifest_location());
-        Ok(())
-    }
+       /// Checks the [`Package`] if it depends on the given [`ModuleDependency`]
+       ///
+       /// # Arguments
+       /// * `dependency` - A reference to a [`ModuleDependency`] that needs to be checked
+       pub fn has_module_dependency(
+           &self,
+           dependency: &StandaloneModule,
+       ) -> Result<bool, PackageError> {
+           Ok(self.load_manifest()?.has_module_dependency(dependency))
+       }
 
-    /// Adds a [`ModuleDependency`] to a [`Package`]
-    ///
-    /// # Arguments
-    /// * `dependency` - A [`ModuleDependency`] that needs to be added
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::{env, fs};
-    /// # use git2::Repository;
-    /// # use url::Url;
-    /// # use knapsac_lib::module::standalone_module::StandaloneModule;
-    /// # use knapsac_lib::package::Package;
-    ///
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let package = Package::download(url, env::temp_dir()).unwrap();
-    ///
-    /// let module_path = env::temp_dir().join("a.sac");
-    /// # fs::write(&module_path, "hello");
-    /// let module = StandaloneModule::create(&module_path).unwrap();
-    /// package.add_module_dependency(module.clone());
-    /// assert!(package.has_module_dependency(&module).unwrap());
-    /// ```
-    pub fn add_module_dependency(&self, dependency: StandaloneModule) -> Result<(), PackageError> {
-        let mut manifest = self.load_manifest()?;
-        manifest.add_module_dependency(dependency);
-        Ok(())
-    }
+       // TODO write docs
+       pub fn remove_module_dependency(
+           &self,
+           dependency: &StandaloneModule,
+       ) -> Result<(), PackageError> {
+           self.load_manifest()?.remove_module_dependency(dependency);
+           Ok(())
+       }
 
-    /// Checks the [`Package`] if it depends on the given [`ModuleDependency`]
-    ///
-    /// # Arguments
-    /// * `dependency` - A reference to a [`ModuleDependency`] that needs to be checked
-    pub fn has_module_dependency(
-        &self,
-        dependency: &StandaloneModule,
-    ) -> Result<bool, PackageError> {
-        Ok(self.load_manifest()?.has_module_dependency(dependency))
-    }
+       /// Adds a [`Module`] to a [`Package`]
+       ///
+       /// # Arguments
+       /// * `module` - A [`Module`] that needs to be added
+       ///
+       /// # Examples
+       /// ```
+       /// # use std::env;
+       /// # use std::path::PathBuf;
+       /// # use git2::Repository;
+       /// # use url::Url;
+       /// # use knapsac_lib::module::package_module::PackageModule;
+       /// # use knapsac_lib::package::Package;
+       ///
+       /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
+       /// let package = Package::download(url, env::temp_dir()).unwrap();
+       /// let module_path: PathBuf = ["src","JSON.sac"].iter().collect();
+       /// let module = PackageModule::create(module_path, None, &package).unwrap();
+       /// package.add_module(module.clone());
+       /// assert!(package.has_module(&module).unwrap());
+       /// ```
+       pub fn add_module(&self, module: PackageModule) -> Result<(), PackageError> {
+           let mut manifest = self.load_manifest()?;
+           manifest.add_module(module);
+           manifest.save(self.manifest_location());
+           Ok(())
+       }
 
-    // TODO write docs
-    pub fn remove_module_dependency(
-        &self,
-        dependency: &StandaloneModule,
-    ) -> Result<(), PackageError> {
-        self.load_manifest()?.remove_module_dependency(dependency);
-        Ok(())
-    }
+       pub(crate) fn has_file<P: AsRef<Path>>(&self, path: P) -> bool {
+           self.local_location.join(path).exists()
+       }
 
-    /// Adds a [`Module`] to a [`Package`]
-    ///
-    /// # Arguments
-    /// * `module` - A [`Module`] that needs to be added
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::env;
-    /// # use std::path::PathBuf;
-    /// # use git2::Repository;
-    /// # use url::Url;
-    /// # use knapsac_lib::module::package_module::PackageModule;
-    /// # use knapsac_lib::package::Package;
-    ///
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let package = Package::download(url, env::temp_dir()).unwrap();
-    /// let module_path: PathBuf = ["src","JSON.sac"].iter().collect();
-    /// let module = PackageModule::create(module_path, None, &package).unwrap();
-    /// package.add_module(module.clone());
-    /// assert!(package.has_module(&module).unwrap());
-    /// ```
-    pub fn add_module(&self, module: PackageModule) -> Result<(), PackageError> {
-        let mut manifest = self.load_manifest()?;
-        manifest.add_module(module);
-        manifest.save(self.manifest_location());
-        Ok(())
-    }
+       /// Searches the [`Package`] for a [`Module`] that is located at the given [`Path`]
+       ///
+       /// # Arguments
+       /// * `location` - [`Path`] pointing to a location where a [`Module`] should be located.
+       ///
+       /// # Examples
+       /// TODO write docs
+       pub fn get_module_by_location(
+           &self,
+           location: &Path,
+       ) -> Result<Option<PackageModule>, PackageError> {
+           Ok(self
+               .load_manifest()?
+               .get_module_by_location(location)
+               .cloned())
+       }
 
-    pub(crate) fn has_file<P: AsRef<Path>>(&self, path: P) -> bool {
-        self.local_location.join(path).exists()
-    }
+       /// Checks the [`Package`] if it provides a given [`Module`]
+       ///
+       /// # Arguments
+       /// * `module` - A reference to a [`Module`] that needs to be checked
+       ///
+       /// # Examples
+       /// TODO write docs
+       pub fn has_module(&self, module: &PackageModule) -> Result<bool, PackageError> {
+           Ok(self.load_manifest()?.modules.contains(module))
+       }
 
-    /// Searches the [`Package`] for a [`Module`] that is located at the given [`Path`]
-    ///
-    /// # Arguments
-    /// * `location` - [`Path`] pointing to a location where a [`Module`] should be located.
-    ///
-    /// # Examples
-    /// TODO write docs
-    pub fn get_module_by_location<P: AsRef<Path>>(
-        &self,
-        location: P,
-    ) -> Result<Option<PackageModule>, PackageError> {
-        Ok(self
-            .load_manifest()?
-            .get_module_by_location(location)
-            .cloned())
-    }
+       /// Checks the [`Package`] if it has any [`Module`] with a given `identifier`
+       ///
+       /// # Arguments
+       /// * `identifier` - The identifier to check for
+       ///
+       pub(crate) fn has_modules_with_identifiers(
+           &self,
+           identifiers: &[String],
+       ) -> Result<bool, PackageError> {
+           Ok(self
+               .load_manifest()?
+               .modules
+               .iter()
+               .any(|m| identifiers.contains(&m.identifier)))
+       }
 
-    /// Checks the [`Package`] if it provides a given [`Module`]
-    ///
-    /// # Arguments
-    /// * `module` - A reference to a [`Module`] that needs to be checked
-    ///
-    /// # Examples
-    /// TODO write docs
-    pub fn has_module(&self, module: &PackageModule) -> Result<bool, PackageError> {
-        Ok(self.load_manifest()?.modules.contains(module))
-    }
+       /// Removes a [`Module`] from a [`Package`]
+       ///
+       /// # Arguments
+       /// * `module` - A reference to a [`Module`] that needs to be removed
+       ///
+       /// # Examples
+       /// ```
+       /// # use std::env;
+       /// # use std::path::PathBuf;
+       /// # use git2::Repository;
+       /// # use url::Url;
+       /// # use knapsac_lib::module::package_module::PackageModule;
+       /// # use knapsac_lib::package::Package;
+       ///
+       /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
+       /// let package = Package::download(url, env::temp_dir()).unwrap();
+       /// let module_path: PathBuf = ["src", "JSON.sac"].iter().collect();
+       /// let module = PackageModule::create(&module_path, None, &package).unwrap();
+       /// package.add_module(module.clone());
+       /// assert!(package.has_module(&module).unwrap());
+       /// package.remove_module(&module);
+       /// assert!(!package.has_module(&module).unwrap());
+       /// ```
+       pub fn remove_module(&self, module: &PackageModule) -> Result<(), PackageError> {
+           let mut manifest = self.load_manifest()?;
+           manifest.remove_module(module);
+           manifest.save(self.manifest_location());
+           Ok(())
+       }
 
-    /// Checks the [`Package`] if it has any [`Module`] with a given `identifier`
-    ///
-    /// # Arguments
-    /// * `identifier` - The identifier to check for
-    ///
-    pub(crate) fn has_modules_with_identifiers(
-        &self,
-        identifiers: &[String],
-    ) -> Result<bool, PackageError> {
-        Ok(self
-            .load_manifest()?
-            .modules
-            .iter()
-            .any(|m| identifiers.contains(&m.identifier)))
-    }
-
-    /// Removes a [`Module`] from a [`Package`]
-    ///
-    /// # Arguments
-    /// * `module` - A reference to a [`Module`] that needs to be removed
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::env;
-    /// # use std::path::PathBuf;
-    /// # use git2::Repository;
-    /// # use url::Url;
-    /// # use knapsac_lib::module::package_module::PackageModule;
-    /// # use knapsac_lib::package::Package;
-    ///
-    /// let url = Url::parse("https://github.com/jcuppen/JSON").unwrap();
-    /// let package = Package::download(url, env::temp_dir()).unwrap();
-    /// let module_path: PathBuf = ["src", "JSON.sac"].iter().collect();
-    /// let module = PackageModule::create(&module_path, None, &package).unwrap();
-    /// package.add_module(module.clone());
-    /// assert!(package.has_module(&module).unwrap());
-    /// package.remove_module(&module);
-    /// assert!(!package.has_module(&module).unwrap());
-    /// ```
-    pub fn remove_module(&self, module: &PackageModule) -> Result<(), PackageError> {
-        let mut manifest = self.load_manifest()?;
-        manifest.remove_module(module);
-        manifest.save(self.manifest_location());
-        Ok(())
-    }
+    */
 }
 
 impl Display for Package {

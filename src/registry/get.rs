@@ -1,15 +1,15 @@
-use crate::error::{NotAPackageError, RepositoryError};
+use crate::error::RegistryError;
 use crate::module::standalone_module::StandaloneModule;
-use crate::package::Package;
 use crate::registry::Registry;
-use crate::utils::infer_working_directory;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub enum FindBy {
-    Location(PathBuf),
+    OutputLocation(PathBuf),
+    Identifier(String),
 }
 
 impl Registry {
+    /*
     /// Retrieves the [`Package`] that is registered at the given [`Path`]
     ///
     /// # Arguments
@@ -39,36 +39,47 @@ impl Registry {
             FindBy::Location(path) => self.get_package_by_local_location(path),
         }
     }
+    */
 
     /// Retrieves the [`StandaloneModule`] that is registered at the given [`Path`]
     ///
     /// # Arguments
-    /// * `location` - [`Path`] pointing to a location for which a [`StandaloneModule`] should be registered.
-    fn get_module_by_location<P: AsRef<Path>>(&self, location: P) -> Option<StandaloneModule> {
+    /// * `location` - [`Path`] pointing to a location for which a [`StandaloneModule`] should be registered
+    fn get_module_by_output_location(&self, output_location: PathBuf) -> Option<StandaloneModule> {
         self.modules
             .iter()
-            .find(|m| m.location == location.as_ref().to_path_buf())
-            .cloned()
+            .find(|(_,m)| m.output_location == output_location).map(|(_,m)|m).cloned()
     }
 
-    //TODO: document
-    pub fn get_module(&self, find_by: FindBy) -> Option<StandaloneModule> {
+    /// Retrieves the [`StandaloneModule`] that is registered at the given [`Path`]
+    ///
+    /// # Arguments
+    /// * `location` - [`Path`] pointing to a location for which a [`StandaloneModule`] should be registered
+    fn get_module_by_identifier(&self, identifier: &String) -> Option<StandaloneModule> {
+        self.modules.get(identifier).cloned()
+    }
+
+    /// Retrieves the [`StandaloneModule`] that is matches the given [`FindBy`]
+    ///
+    /// # Arguments
+    /// * `find_by` - [`FindBy`] object representing how to look for a [`StandaloneModule`]
+    ///
+    /// TODO: write docs
+    pub fn get_module(&self, find_by: FindBy) -> Result<Option<StandaloneModule>, RegistryError> {
         match find_by {
-            FindBy::Location(path) => self.get_module_by_location(path),
+            FindBy::OutputLocation(output_location) => {
+                Ok(self.get_module_by_output_location(output_location))
+            }
+            FindBy::Identifier(id) => {
+                Ok(self.get_module_by_identifier(&id))
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::NotAPackageError;
-    use crate::package::Package;
-    use crate::registry::Registry;
-    use git2::Repository;
-    use std::collections::HashSet;
-    use std::env;
-    use url::Url;
-
+    /*
     #[test]
     fn test_get_package_by_local_location() {
         let registry_path = env::temp_dir().join("registry.json");
@@ -87,7 +98,9 @@ mod tests {
             .unwrap();
         assert_eq!(found_package, &package);
     }
+    */
 
+    /*
     #[test]
     fn test_get_package_by_local_location_not_found() {
         let registry_path = env::temp_dir().join("registry.json");
@@ -106,23 +119,28 @@ mod tests {
         assert!(opt_package.is_none());
     }
 
-    #[test]
-    fn test_get_package_by_local_location_panic_not_a_git_repo() {
-        let registry_path = env::temp_dir().join("registry.json");
-        let package_path = env::temp_dir().join("not_a_repository");
-        let repo = Repository::discover(&package_path);
+     */
+    /*
 
-        assert!(repo.is_err());
+       #[test]
+       fn test_get_package_by_local_location_panic_not_a_git_repo() {
+           let registry_path = env::temp_dir().join("registry.json");
+           let package_path = env::temp_dir().join("not_a_repository");
+           let repo = Repository::discover(&package_path);
 
-        let registry = Registry {
-            location: registry_path,
-            packages: HashSet::new(),
-            modules: HashSet::new(),
-        };
+           assert!(repo.is_err());
 
-        let err = registry
-            .get_package_by_local_location(package_path)
-            .unwrap_err();
-        assert_eq!(err, NotAPackageError);
-    }
+           let registry = Registry {
+               location: registry_path,
+               packages: HashSet::new(),
+               modules: HashSet::new(),
+           };
+
+           let err = registry
+               .get_package_by_local_location(package_path)
+               .unwrap_err();
+           assert_eq!(err, NotAPackageError);
+       }
+
+    */
 }

@@ -9,3 +9,5 @@ pub mod registry;
 mod manifest;
 mod utils;
 mod version;
+
+const REGISTRY_PATH: &str = "/home/job/knapsac_registry.json";

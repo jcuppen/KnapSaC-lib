@@ -23,15 +23,22 @@ pub enum RegistryError {
     RegistryPathNotFile,
     NoRegistryFound,
     InvalidRegistry,
+    ModuleAlreadyInRegistry,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ModuleError {
-    LocationNotRelative,
-    LocationNotAbsolute,
-    DoesNotExist,
-    InvalidManifest,
+    // SourceLocationNotAbsolute,
+    OutputLocationNotAbsolute,
+    // SourceLocationNotRelative,
+    OutputLocationNotRelative,
+    // SourceLocationDoesNotExist,
+    OutputLocationDoesNotExist,
+    OutputLocationNotADirectory,
+    // InvalidManifest,
     CyclicDependency,
+    NoSuchDependency,
+    RegistryError(RegistryError),
 }
 
 #[derive(Debug)]
@@ -40,7 +47,7 @@ pub enum DependencyError {
     DoesNotExist,
     LocationNotAbsolute,
 }
-
-pub(crate) enum ManifestError {
-    InvalidManifest,
-}
+//
+// pub(crate) enum ManifestError {
+//     InvalidManifest,
+// }
