@@ -9,14 +9,14 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Serialize)]
 pub struct Module {
-    pub output_directory: PathBuf,
+    pub output_path: PathBuf,
     dependencies: HashSet<String>
 }
 
 impl Module {
-    pub(crate) fn create(output_directory: PathBuf) -> Self {
+    pub(crate) fn create(output_path: PathBuf) -> Self {
         Module {
-            output_directory,
+            output_path,
             dependencies: HashSet::new(),
         }
     }

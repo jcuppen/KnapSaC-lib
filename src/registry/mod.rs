@@ -8,10 +8,12 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
+use crate::executable::Executable;
 
 #[derive(Serialize, Deserialize)]
 pub struct Registry {
     modules: HashMap<String, Module>,
+    executables: HashMap<PathBuf, Executable>
 }
 
 impl Registry {
@@ -27,6 +29,7 @@ impl Registry {
     fn init() -> Self {
         Registry {
             modules: HashMap::new(),
+            executables: HashMap::new(),
         }
     }
 
