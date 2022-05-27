@@ -1,17 +1,23 @@
-use std::path::{Path, PathBuf};
+mod remove;
+mod add;
+mod get;
 
-mod manifest;
-pub mod package_module;
-pub mod standalone_module;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use serde::Serialize;
+use serde::Deserialize;
 
-pub(crate) trait Module {
-    fn prepare(
-        identifier: &str,
-        output_location: &Path,
-    ) -> (String, PathBuf) {
-        (
-            identifier.to_string(),
-            output_location.to_path_buf(),
-        )
+#[derive(Deserialize, Serialize)]
+pub struct Module {
+    pub output_directory: PathBuf,
+    dependencies: HashSet<String>
+}
+
+impl Module {
+    pub(crate) fn create(output_directory: PathBuf) -> Self {
+        Module {
+            output_directory,
+            dependencies: HashSet::new(),
+        }
     }
 }

@@ -1,13 +1,4 @@
 extern crate core;
 
-pub mod dependency;
-pub mod error;
-pub mod module;
-pub mod package;
 pub mod registry;
-
-mod manifest;
-mod utils;
-mod version;
-
-const REGISTRY_PATH: &str = "/home/job/knapsac_registry.json";
+pub(crate) mod module;
