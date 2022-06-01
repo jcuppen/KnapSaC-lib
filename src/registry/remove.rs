@@ -1,4 +1,5 @@
 use std::path::Path;
+use crate::HasDependencies;
 use crate::registry::Registry;
 
 impl Registry {
@@ -7,7 +8,6 @@ impl Registry {
             .for_each(|m| m.remove_dependency(identifier));
         self.executables.values_mut()
             .for_each(|e| e.remove_dependency(identifier));
-
 
         self.modules.remove(identifier);
         self.save()

@@ -1,4 +1,4 @@
-pub mod add;
+mod add;
 mod get;
 mod remove;
 
