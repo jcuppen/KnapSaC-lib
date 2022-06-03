@@ -9,10 +9,12 @@ use serde::Serialize;
 pub mod registry;
 pub(crate) mod module;
 pub(crate) mod executable;
+pub mod entry;
+mod package;
 
 #[derive(Hash)]
 #[derive(Deserialize, Serialize)]
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Dependency {
     StrayModule(PathBuf),
     StandaloneModule,
@@ -26,16 +28,6 @@ pub(crate) trait HasDependencies {
     fn add_dependency(&mut self, identifier: String, dependency: Dependency) {
         self.dependencies_mut().borrow_mut().insert(identifier, dependency);
     }
-
-    // fn has_dependency(&self, dependency_identifier: &str) -> bool {
-    //     self.dependencies().iter().any(|d|{
-    //         match d {
-    //             Dependency::StrayModule(id, _) => dependency_identifier == id,
-    //             Dependency::StandaloneModule(id) => dependency_identifier == id,
-    //             Dependency::PackageModule => { panic!() }
-    //         }
-    //     })
-    // }
 
     fn get_dependency(&self, identifier: &str) -> Option<&Dependency> {
         self.dependencies().get(identifier)

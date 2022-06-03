@@ -2,18 +2,20 @@ mod add;
 mod get;
 mod remove;
 
+use crate::executable::Executable;
 use crate::module::Module;
+use crate::package::Package;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
-use crate::executable::Executable;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Registry {
+    packages: HashMap<String, Package>,
     modules: HashMap<String, Module>,
-    executables: HashMap<PathBuf, Executable>
+    executables: HashMap<PathBuf, Executable>,
 }
 
 impl Registry {
@@ -23,11 +25,13 @@ impl Registry {
 
     fn save(&self) {
         let contents = serde_json::to_string(self).unwrap();
+        println!("WRITING REGISTRY TO : {}", Self::registry_path().display());
         write(Self::registry_path(), contents).unwrap();
     }
 
     fn init() -> Self {
         Registry {
+            packages: HashMap::new(),
             modules: HashMap::new(),
             executables: HashMap::new(),
         }

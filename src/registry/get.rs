@@ -1,3 +1,4 @@
+use crate::entry::Entry;
 use crate::executable::Executable;
 use crate::module::Module;
 use crate::registry::Registry;
@@ -11,35 +12,26 @@ impl Registry {
         self.modules.get(identifier)
     }
 
-    pub fn get_dependency_for_module(
-        &self,
-        module_identifier: &str,
-        dependency_identifier: &str,
-    ) -> Option<Module> {
-        let m = self.modules.get(module_identifier)?;
-        return match m.get_dependency(dependency_identifier)? {
-            StrayModule(output_path) => Some(Module {
-                output_path: output_path.to_path_buf(),
-                dependencies: HashMap::new(),
-            }),
-            StandaloneModule => self.modules.get(dependency_identifier).cloned(),
-            PackageModule => {
-                panic!()
-            }
-        };
-    }
-
     pub fn get_executable(&self, source_path: &Path) -> Option<&Executable> {
         self.executables.get(source_path)
     }
 
-    pub fn get_dependency_for_executable(
-        &self,
-        source_path: &Path,
-        dependency_identifier: &str,
-    ) -> Option<Module> {
-        let e = self.executables.get(source_path)?;
-        return match e.get_dependency(dependency_identifier)? {
+    pub fn get_dependency(&self, entry: Entry, dependency_identifier: &str) -> Option<Module> {
+        let d = match &entry {
+            Entry::Executable(source_path) => self
+                .get_executable(source_path)?
+                .get_dependency(dependency_identifier),
+            Entry::StandaloneModule(identifier) => self
+                .get_module(identifier)?
+                .get_dependency(dependency_identifier),
+            Entry::PackageModule(package_identifier, module_identifier) => self
+                .packages
+                .get(package_identifier)?
+                .get_module(module_identifier)?
+                .get_dependency(dependency_identifier),
+        };
+
+        return match d? {
             StrayModule(output_path) => Some(Module {
                 output_path: output_path.to_path_buf(),
                 dependencies: HashMap::new(),

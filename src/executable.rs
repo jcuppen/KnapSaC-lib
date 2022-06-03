@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::{Dependency, HasDependencies};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Executable {
     pub(crate) dependencies: HashMap<String, Dependency>
 }

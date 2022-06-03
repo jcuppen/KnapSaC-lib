@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde::Deserialize;
 use crate::{Dependency, HasDependencies};
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Module {
     pub output_path: PathBuf,
     pub(crate) dependencies: HashMap<String, Dependency>
