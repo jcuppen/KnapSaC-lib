@@ -19,9 +19,18 @@ impl Registry {
     }
 
     pub fn add_dependency(&mut self, entry: Entry, dependency_identifier: String, dependency: Dependency) {
-        if self.get_module(&dependency_identifier).is_some() {
+        if match dependency {
+            Dependency::StrayModule(_) => true,
+            Dependency::StandaloneModule => {
+                self.get_module(&dependency_identifier).is_some()
+            }
+            Dependency::PackageModule => {
+                self.get_module(&dependency_identifier).is_some()
+            }
+        } {
             match &entry {
                 Entry::Executable(source_path) => {
+                    println!("HELP");
                     let e = self.executables.get_mut(source_path).unwrap();
                     e.add_dependency(dependency_identifier, dependency);
                 }
@@ -34,8 +43,8 @@ impl Registry {
                     p.add_dependency(module_identifier, dependency_identifier, dependency);
                 }
             }
-
         }
+
         println!("{:?}", self);
         self.save();
     }
