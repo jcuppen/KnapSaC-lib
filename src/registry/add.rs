@@ -1,51 +1,39 @@
 use crate::module::Module;
 use crate::registry::Registry;
 use std::path::PathBuf;
-use crate::{Dependency, HasDependencies};
-use crate::entry::Entry;
-use crate::executable::Executable;
+use crate::dependency::{Dependency};
 
 impl Registry {
-    pub fn add_module(&mut self, identifier: String, output_directory: PathBuf) {
-        let module = Module::create(output_directory);
-        self.modules.insert(identifier, module);
+    pub fn add_item(
+        &mut self,
+        source_file: PathBuf,
+        output_directory: PathBuf,
+    ) {
+        let module = Module::create(&output_directory);
+        println!("{:?}", module);
+        self.items.insert(source_file, module);
         self.save();
     }
 
-    pub fn add_executable(&mut self, source_path: PathBuf) {
-        let executable = Executable::create();
-        self.executables.insert(source_path, executable);
-        self.save();
-    }
+    pub fn add_dependency(
+        &mut self,
+        source_file: PathBuf,
+        dependency: Dependency,
+    ) {
+        if self.dependency_exists(&dependency) {
+            let identifier = if let Dependency::Stray(id,_) = &dependency {
+                id.to_string()
+            } else {
+                let d = self.dep_to_module(&dependency).unwrap();
+                d.identifier.unwrap()
+            };
 
-    pub fn add_dependency(&mut self, entry: Entry, dependency_identifier: String, dependency: Dependency) {
-        if match dependency {
-            Dependency::StrayModule(_) => true,
-            Dependency::StandaloneModule => {
-                self.get_module(&dependency_identifier).is_some()
-            }
-            Dependency::PackageModule => {
-                self.get_module(&dependency_identifier).is_some()
-            }
-        } {
-            match &entry {
-                Entry::Executable(source_path) => {
-                    println!("HELP");
-                    let e = self.executables.get_mut(source_path).unwrap();
-                    e.add_dependency(dependency_identifier, dependency);
-                }
-                Entry::StandaloneModule(identifier) => {
-                    let m = self.modules.get_mut(identifier).unwrap();
-                    m.add_dependency(dependency_identifier, dependency);
-                }
-                Entry::PackageModule(package_identifier, module_identifier) => {
-                    let p = self.packages.get_mut(package_identifier).unwrap();
-                    p.add_dependency(module_identifier, dependency_identifier, dependency);
-                }
-            }
+            let m = self.get_item_mut(&source_file).unwrap();
+            m.add_dependency(identifier, dependency);
+        } else {
+            panic!();
         }
 
-        println!("{:?}", self);
         self.save();
     }
 }

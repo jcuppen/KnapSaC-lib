@@ -1,25 +1,30 @@
-use crate::entry::Entry;
-use crate::HasDependencies;
+use std::path::{Path};
+use crate::dependency::Dependency;
 use crate::registry::Registry;
 
 impl Registry {
-    pub fn remove(&mut self, entry: Entry) {
-        match entry {
-            Entry::Executable(source_path) => {
-                self.executables.remove(&source_path);
+    pub(crate) fn remove_executable(&mut self, source_file: &Path) {
+        self.items.remove(source_file);
+    }
+    pub(crate) fn remove_module(&mut self, source_file: &Path) {
+        let i = self.items.remove_entry(source_file);
+        if let Some((_,removed_module)) = i {
+            for module in self.items.values_mut() {
+                let dep = Dependency::Standalone(source_file.to_path_buf());
+                if let Some(id) = &removed_module.identifier {
+                    module.remove_dependency(id, &dep)
+                }
             }
-            Entry::StandaloneModule(identifier) => {
-                self.modules.values_mut()
-                    .for_each(|m| m.remove_dependency(&identifier));
-                self.executables.values_mut()
-                    .for_each(|e| e.remove_dependency(&identifier));
-
-                self.modules.remove(&identifier);
+        }
+    }
+    pub fn remove_item(&mut self, source_file: &Path) {
+        if let Some(i) = self.get_module_mut(source_file) {
+            if !i.is_executable() {
+                self.remove_module(source_file);
+            } else {
+                self.remove_executable(source_file);
             }
-            Entry::PackageModule(_package_identifier, _module_identifier) => {
-                panic!()
-            }
-        };
+        }
         self.save();
     }
 }

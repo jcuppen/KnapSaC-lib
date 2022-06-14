@@ -1,45 +1,42 @@
-use crate::entry::Entry;
-use crate::executable::Executable;
+use crate::dependency::Dependency;
 use crate::module::Module;
 use crate::registry::Registry;
-use crate::Dependency::{PackageModule, StandaloneModule, StrayModule};
-use crate::HasDependencies;
-use std::collections::HashMap;
 use std::path::Path;
 
 impl Registry {
-    pub fn get_module(&self, identifier: &str) -> Option<&Module> {
-        self.modules.get(identifier)
+    pub fn get_item(&self, source_path: &Path) -> Option<&Module> {
+        self.items.get(source_path)
     }
 
-    pub fn get_executable(&self, source_path: &Path) -> Option<&Executable> {
-        self.executables.get(source_path)
+    pub fn get_item_mut(&mut self, source_path: &Path) -> Option<&mut Module> {
+        self.items.get_mut(source_path)
     }
 
-    pub fn get_dependency(&self, entry: Entry, dependency_identifier: &str) -> Option<Module> {
-        let d = match &entry {
-            Entry::Executable(source_path) => self
-                .get_executable(source_path)?
-                .get_dependency(dependency_identifier),
-            Entry::StandaloneModule(identifier) => self
-                .get_module(identifier)?
-                .get_dependency(dependency_identifier),
-            Entry::PackageModule(package_identifier, module_identifier) => self
-                .packages
-                .get(package_identifier)?
-                .get_module(module_identifier)?
-                .get_dependency(dependency_identifier),
-        };
+    pub(crate) fn get_module_mut(&mut self, source_path: &Path) -> Option<&mut Module> {
+        self.items
+            .get_mut(source_path)
+            .and_then(|i| if i.is_executable() { None } else { Some(i) })
+    }
 
-        return match d? {
-            StrayModule(output_path) => Some(Module {
-                output_path: output_path.to_path_buf(),
-                dependencies: HashMap::new(),
-            }),
-            StandaloneModule => self.modules.get(dependency_identifier).cloned(),
-            PackageModule => {
-                panic!()
-            }
-        };
+    pub fn get_module(&self, source_path: &Path) -> Option<&Module> {
+        let i = self.items.get(source_path);
+        if i?.is_executable() {
+            None
+        } else {
+            i
+        }
+    }
+
+    pub fn get_dependency(
+        &self,
+        source_path: &Path,
+        dependency_identifier: &str,
+    ) -> Option<&Dependency> {
+        let i = self.get_item(source_path);
+        let d = i?.get_dependency(dependency_identifier);
+        if self.dependency_exists(d?) {
+            return d;
+        }
+        None
     }
 }
