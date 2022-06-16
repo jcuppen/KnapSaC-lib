@@ -10,7 +10,6 @@ impl Registry {
         output_directory: PathBuf,
     ) {
         let module = Module::create(&output_directory);
-        println!("{:?}", module);
         self.items.insert(source_file, module);
         self.save();
     }
