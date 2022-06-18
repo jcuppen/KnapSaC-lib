@@ -1,4 +1,4 @@
-use crate::dependency::Dependency;
+use crate::dependency::{Dependency, HasDependencies};
 use crate::registry::Registry;
 use std::path::Path;
 
@@ -8,18 +8,32 @@ impl Registry {
     }
 
     pub fn has_module_source(&self, source_path: &Path) -> bool {
-        self.items
-            .iter()
-            .any(|(k, v)| k == source_path && !v.is_executable())
+        if self.get_module(source_path).is_some() {
+            return true;
+        }
+
+        self.packages
+            .values()
+            .any(|v| v.has_module_source(source_path))
     }
+
     pub fn has_module_id(&self, identifier: &str) -> bool {
-        self.items.values().any(|v| {
+        let in_items = self.items.values().any(|v| {
             if let Some(id) = &v.identifier {
-                id == identifier && !v.is_executable()
-            } else {
-                false
+                return id == identifier && !v.is_executable();
             }
-        })
+            false
+        });
+
+        if in_items {
+            return true;
+        }
+
+        self.packages.values().any(|v| v.has_module_id(identifier))
+    }
+
+    pub fn has_package(&self, identifier: &str) -> bool {
+        self.packages.contains_key(identifier)
     }
 
     pub fn has_dependency(&self, source_path: &Path, dependency_identifier: &str) -> bool {
@@ -31,13 +45,20 @@ impl Registry {
 
     pub(crate) fn dependency_exists(&self, dependency: &Dependency) -> bool {
         match dependency {
-            Dependency::Stray(_, _) => true,
-            Dependency::Standalone(source_path) => self.has_module_source(source_path),
-            Dependency::Package => panic!(),
+            Dependency::Stray(_identifier, _output_dir) => true,
+            Dependency::Standalone(source_file) => self.has_module_source(source_file),
+            Dependency::Package(package_id, module_id) => {
+                if let Some(p) = self.get_package(package_id) {
+                    return p.has_module_id(module_id);
+                }
+                false
+            }
         }
     }
 
     pub fn has_executable_source(&self, source_path: &Path) -> bool {
-        self.items.iter().any(|(k,v)|k == source_path && v.is_executable())
+        self.items
+            .iter()
+            .any(|(k, v)| k == source_path && v.is_executable())
     }
 }

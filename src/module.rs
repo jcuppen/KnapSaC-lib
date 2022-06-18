@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
-use std::path::{Path, PathBuf};
-use crate::dependency::Dependency;
+use std::path::{PathBuf};
+use crate::dependency::{Dependency, HasDependencies};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Module {
@@ -15,10 +15,10 @@ pub struct Module {
 }
 
 impl Module {
-    pub(crate) fn create(output_path: &Path) -> Self {
+    pub(crate) fn create_module(output_path: PathBuf) -> Self {
         Module {
             identifier: None,
-            output_path: output_path.to_path_buf(),
+            output_path,
             dependencies: HashMap::new(),
         }
     }
@@ -26,25 +26,14 @@ impl Module {
     pub(crate) fn is_executable(&self) -> bool {
         self.identifier.is_none()
     }
+}
 
-    pub(crate) fn add_dependency(&mut self, identifier: String, dependency: Dependency) {
-        self.dependencies.insert(identifier, dependency);
+impl HasDependencies for Module {
+    fn dependencies(&self) -> &HashMap<String, Dependency> {
+        &self.dependencies
     }
 
-    pub(crate) fn get_dependency(&self, identifier: &str) -> Option<&Dependency> {
-        self.dependencies.get(identifier)
-    }
-
-    pub(crate) fn has_dependency(&self, identifier: &str) -> bool {
-        self.dependencies.contains_key(identifier)
-    }
-
-    pub(crate) fn remove_dependency(&mut self, identifier: &str, dependency: &Dependency) {
-        if match self.dependencies.get(identifier) {
-            None => false,
-            Some(d) => d == dependency,
-        } {
-            self.dependencies.remove(identifier);
-        }
+    fn dependencies_mut(&mut self) -> &mut HashMap<String, Dependency> {
+        &mut self.dependencies
     }
 }
