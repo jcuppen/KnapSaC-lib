@@ -16,7 +16,7 @@ impl Registry {
             .collect()
     }
 
-    pub fn search_modules_by_source_prefix(&self, prefix: &Path) -> Vec<(&PathBuf, &Module)> {
+    pub(crate) fn search_modules_by_source_prefix(&self, prefix: &Path) -> Vec<(&PathBuf, &Module)> {
         self.items
             .iter()
             .filter(|(k, _)| k.starts_with(prefix))

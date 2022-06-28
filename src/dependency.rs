@@ -36,6 +36,10 @@ pub(crate) trait HasDependencies {
         self.dependencies().contains_key(identifier)
     }
 
+    fn has_only_package_module_dependencies(&self) -> bool {
+        self.dependencies().iter().all(|(_,d)|d.is_package_module())
+    }
+
     fn remove_dependency(&mut self, identifier: &str, dependency: &Dependency) {
         if match self.dependencies().get(identifier) {
             None => false,

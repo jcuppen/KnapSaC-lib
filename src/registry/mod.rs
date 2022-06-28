@@ -4,8 +4,9 @@ mod has;
 mod mark;
 mod remove;
 mod search;
+mod package;
 
-use crate::dependency::{Dependency, HasDependencies};
+use crate::dependency::{Dependency};
 use crate::module::Module;
 use crate::package::Package;
 use serde::Deserialize;
@@ -16,7 +17,11 @@ use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 pub struct Registry {
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default)]
     packages: HashMap<String, Package>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default)]
     items: HashMap<PathBuf, Module>,
 }
 
@@ -58,45 +63,5 @@ impl Registry {
             };
         }
         None
-    }
-
-    pub fn package(&mut self, identifier: String, package_root: &PathBuf) {
-        let mut package = Package::create(package_root.clone());
-
-        // turn modules into package modules;
-        self.search_modules_by_source_prefix(package_root)
-            .iter()
-            .for_each(|&(k, v)| {
-                let rel = k.strip_prefix(package_root).unwrap().to_path_buf();
-                package.add_module(rel, v);
-            });
-
-        let mut a: Vec<Module> = vec![];
-        // remove and collect old standalone modules;
-        for p in self
-            .search_modules_by_source_prefix(package_root)
-            .iter()
-            .map(|&(k, _)| k.clone())
-            .collect::<Vec<PathBuf>>()
-        {
-            a.push(self.remove_module(&p, false).unwrap());
-        }
-
-        // replace module dependencies with package module dependencies;
-        self.items.values_mut().for_each(|v| {
-            a.iter().for_each(
-                |rm| match v.get_dependency(&rm.identifier.clone().unwrap()) {
-                    None | Some(Dependency::Stray(_, _)) | Some(Dependency::Package(_, _)) => {}
-                    Some(Dependency::Standalone(_)) => {
-                        let module_identifier = rm.identifier.clone().unwrap();
-                        let dependency = Dependency::Package(identifier.clone(), module_identifier.clone());
-                        v.add_dependency(module_identifier, dependency);
-                    }
-                },
-            )
-        });
-
-        self.packages.insert(identifier, package);
-        self.save();
     }
 }

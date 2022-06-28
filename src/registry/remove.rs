@@ -1,9 +1,20 @@
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 use crate::dependency::{Dependency, HasDependencies};
 use crate::module::Module;
 use crate::registry::Registry;
 
 impl Registry {
+    pub(crate) fn remove_and_collect(&mut self, source_files: Vec<PathBuf>) -> Vec<Module> {
+        let mut removed_modules= vec![];
+
+        for path in source_files {
+            removed_modules.push(self.remove_module(&path, false).unwrap());
+        }
+
+        removed_modules
+    }
+
+
     pub(crate) fn remove_executable(&mut self, source_file: &Path) {
         self.items.remove(source_file);
     }
