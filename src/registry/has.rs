@@ -12,9 +12,8 @@ impl Registry {
             return true;
         }
 
-        self.packages
-            .values()
-            .any(|v| v.has_module_source(source_path))
+        self.packages.iter()
+            .any(|(package_root, package)| package.has_module_source(package_root, source_path))
     }
 
     pub fn has_module_id(&self, identifier: &str) -> bool {
@@ -33,7 +32,7 @@ impl Registry {
     }
 
     pub fn has_package(&self, identifier: &str) -> bool {
-        self.packages.contains_key(identifier)
+        self.packages.values().any(|p|p.identifier == identifier)
     }
 
     pub fn has_dependency(&self, source_path: &Path, dependency_identifier: &str) -> bool {
@@ -48,7 +47,7 @@ impl Registry {
             Dependency::Stray(_identifier, _output_dir) => true,
             Dependency::Standalone(source_file) => self.has_module_source(source_file),
             Dependency::Package(package_id, module_id) => {
-                if let Some(p) = self.get_package(package_id) {
+                if let Some((_,p)) = self.get_package(package_id) {
                     return p.has_module_id(module_id);
                 }
                 false

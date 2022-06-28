@@ -2,7 +2,7 @@ use crate::dependency::{Dependency, HasDependencies};
 use crate::module::Module;
 use crate::package::Package;
 use crate::registry::Registry;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 impl Registry {
     pub fn get_item(&self, source_path: &Path) -> Option<&Module> {
@@ -13,11 +13,11 @@ impl Registry {
         self.items.get_mut(source_path)
     }
 
-    pub fn get_package(&self, identifier: &str) -> Option<&Package> {
-        self.packages.get(identifier)
+    pub fn get_package(&self, identifier: &str) -> Option<(&PathBuf, &Package)> {
+        self.packages.iter().find(|(_,package)|package.identifier == identifier)
     }
-    pub fn get_package_mut(&mut self, identifier: &str) -> Option<&mut Package> {
-        self.packages.get_mut(identifier)
+    pub fn get_package_mut(&mut self, identifier: &str) -> Option<(&PathBuf, &mut Package)> {
+        self.packages.iter_mut().find(|(_,package)|package.identifier == identifier)
     }
 
     pub(crate) fn get_module_mut(&mut self, source_path: &Path) -> Option<&mut Module> {

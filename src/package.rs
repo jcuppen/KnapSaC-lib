@@ -1,3 +1,4 @@
+
 use crate::module::Module;
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,37 +9,37 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
 use crate::language::Language;
-use crate::package_manifest::PackageManifest;
 
 use crate::version::{SemVerIncrement, Version};
+use crate::version::Version::SemVer;
 
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Package {
-    pub(crate) package_root: PathBuf,
+    pub(crate) identifier: String,
+    pub(crate) version: Version,
     pub(crate) language: Language,
+    pub(crate) remote_location: Option<Url>,
     pub(crate) modules: HashMap<String, (PathBuf, Module)>,
 }
 
 impl Package {
-    fn manifest_path(&self) -> PathBuf {
-        self.package_root.join("manifest.json")
-    }
-
-    pub(crate) fn create(package_root: PathBuf, compiler_command_name: String, output_option: String) -> Self {
+    pub(crate) fn create(identifier: String, language: Language) -> Self {
         Package {
-            package_root,
-            language: Language { compiler_command_name, output_option },
-            modules: HashMap::new(),
+            identifier,
+            version: Default::default(),
+            language,
+            remote_location: None,
+            modules: Default::default()
         }
     }
 
-    pub fn build(&self) {
+    pub fn build(&self, package_root: &Path) {
         for (path,module) in self.modules.values() {
             Command::new(&self.language.compiler_command_name)
-                .arg(self.package_root.join(path))
+                .arg(package_root.join(path))
                 .arg(&self.language.output_option)
-                .arg(self.package_root.join(&module.output_path)).output().expect("failed to build");
+                .arg(package_root.join(&module.output_path)).output().expect("failed to build");
         }
     }
 
@@ -46,8 +47,8 @@ impl Package {
         self.modules.insert(module.identifier.clone().unwrap(), (relative_path, module));
     }
 
-    pub(crate) fn has_module_source(&self, source_file: &Path) -> bool {
-        let stripped_path = source_file.strip_prefix(&self.package_root).unwrap();
+    pub(crate) fn has_module_source(&self, package_root: &Path, source_file: &Path) -> bool {
+        let stripped_path = source_file.strip_prefix(package_root).unwrap();
         self.modules.values().any(|(a, _)| stripped_path == a)
     }
 
@@ -70,25 +71,23 @@ impl Package {
             .collect()
     }
 
-    pub(crate) fn set_remote_location(&self, git_url: Url) {
-        let mut manifest = PackageManifest::load(self.manifest_path());
-        manifest.remote_location = Some(git_url);
-        manifest.save(self.manifest_path());
-    }
-
-    pub(crate) fn get_remote_location(&self) -> Option<Url> {
-        let manifest = PackageManifest::load(self.manifest_path());
-        manifest.remote_location
-    }
-
-    pub(crate) fn get_version(&self) -> Version {
-        let manifest = PackageManifest::load(self.manifest_path());
-        manifest.version
-    }
-
     pub(crate) fn increment_version(&mut self, version_increment: SemVerIncrement) {
-        let mut manifest = PackageManifest::load(self.manifest_path());
-        manifest.increment_version(version_increment);
-        manifest.save(self.manifest_path());
+        let new_version = match self.version {
+            Version::NotVersioned => {
+                match version_increment {
+                    SemVerIncrement::Major => SemVer(1,0,0),
+                    SemVerIncrement::Minor => SemVer(0,1,0),
+                    SemVerIncrement::Patch => SemVer(0,0,1),
+                }
+            }
+            SemVer(major, minor, patch) => {
+                match version_increment {
+                    SemVerIncrement::Major => SemVer(major + 1,0,0),
+                    SemVerIncrement::Minor => SemVer(major,minor + 1,0),
+                    SemVerIncrement::Patch => SemVer(major,minor,patch + 1),
+                }
+            }
+        };
+        self.version = new_version;
     }
 }

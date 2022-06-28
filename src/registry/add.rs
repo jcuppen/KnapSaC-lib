@@ -55,7 +55,7 @@ impl Registry {
                 .unwrap(),
         };
 
-        let package = self.get_package_mut(package_identifier).unwrap();
+        let (_, package) = self.get_package_mut(package_identifier).unwrap();
         let module = package.get_module_mut(module_identifier).unwrap();
         module.add_dependency(identifier, dependency);
 

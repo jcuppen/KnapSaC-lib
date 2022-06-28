@@ -1,11 +1,11 @@
-use std::path::{Path, PathBuf};
 use crate::dependency::{Dependency, HasDependencies};
 use crate::module::Module;
 use crate::registry::Registry;
+use std::path::{Path, PathBuf};
 
 impl Registry {
     pub(crate) fn remove_and_collect(&mut self, source_files: Vec<PathBuf>) -> Vec<Module> {
-        let mut removed_modules= vec![];
+        let mut removed_modules = vec![];
 
         for path in source_files {
             removed_modules.push(self.remove_module(&path, false).unwrap());
@@ -14,11 +14,14 @@ impl Registry {
         removed_modules
     }
 
-
     pub(crate) fn remove_executable(&mut self, source_file: &Path) {
         self.items.remove(source_file);
     }
-    pub(crate) fn remove_module(&mut self, source_file: &Path, remove_dependencies: bool) -> Option<Module> {
+    pub(crate) fn remove_module(
+        &mut self,
+        source_file: &Path,
+        remove_dependencies: bool,
+    ) -> Option<Module> {
         let r_mod = self.items.remove(source_file);
         if let Some(removed_module) = &r_mod {
             if remove_dependencies {
@@ -36,27 +39,36 @@ impl Registry {
 
     pub fn remove_item(&mut self, source_file: &Path) -> Option<Module> {
         let mut removed_item = None;
-        if let Some(item) = self.get_module_mut(source_file) {
-            if !item.is_executable() {
-                removed_item = self.remove_module(source_file, true);
-            } else {
-                self.remove_executable(source_file);
-            }
+        let item = self.get_module_mut(source_file)?;
+        if !item.is_executable() {
+            removed_item = self.remove_module(source_file, true);
+        } else {
+            self.remove_executable(source_file);
         }
         self.save();
         removed_item
     }
 
     pub fn remove_package(&mut self, package_identifier: &str) {
-        let removed_package_opt = self.packages.remove(package_identifier);
-        if removed_package_opt.is_none() {
+        let entry_opt = self
+            .packages
+            .iter_mut()
+            .find(|(_, p)| p.identifier == package_identifier);
+        let root = if let Some((pr, _)) = entry_opt {
+            pr.clone()
+        } else {
             return;
-        }
+        };
 
-        let removed_package = removed_package_opt.unwrap();
+        let removed_package = if let Some(r) = self.packages.remove(&root) {
+            r
+        } else {
+            return;
+        };
 
         for removed_module_id in removed_package.modules.keys() {
-            let dep = Dependency::Package(package_identifier.to_string(), removed_module_id.clone());
+            let dep =
+                Dependency::Package(package_identifier.to_string(), removed_module_id.clone());
 
             for item in self.items.values_mut() {
                 item.remove_dependency(removed_module_id, &dep);

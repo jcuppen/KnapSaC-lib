@@ -19,7 +19,7 @@ use std::path::PathBuf;
 pub struct Registry {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    packages: HashMap<String, Package>,
+    packages: HashMap<PathBuf, Package>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
     items: HashMap<PathBuf, Module>,
@@ -58,7 +58,7 @@ impl Registry {
                 Dependency::Stray(_, _) => panic!(),
                 Dependency::Standalone(s) => self.get_module(s),
                 Dependency::Package(package_identifier, module_identifier) => self
-                    .get_package(package_identifier)?
+                    .get_package(package_identifier)?.1
                     .get_module(module_identifier),
             };
         }

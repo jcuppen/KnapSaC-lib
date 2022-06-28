@@ -1,4 +1,5 @@
 use crate::dependency::{Dependency, HasDependencies};
+use crate::language::Language;
 use crate::module::Module;
 use crate::package::Package;
 use crate::registry::Registry;
@@ -36,7 +37,7 @@ impl Registry {
     fn module_dependencies_to_package_module_dependencies(
         &mut self,
         removed_modules: Vec<Module>,
-        identifier: String,
+        identifier: &str,
     ) {
         self.items.values_mut().for_each(|v| {
             removed_modules.iter().for_each(|rm| {
@@ -45,7 +46,7 @@ impl Registry {
                     Some(Dependency::Standalone(_)) => {
                         let module_identifier = rm.identifier.clone().unwrap();
                         let dependency =
-                            Dependency::Package(identifier.clone(), module_identifier.clone());
+                            Dependency::Package(identifier.to_string(), module_identifier.clone());
                         v.add_dependency(module_identifier, dependency);
                     }
                 }
@@ -55,19 +56,21 @@ impl Registry {
 
     pub fn package(
         &mut self,
-        identifier: String,
+        identifier: &str,
         package_root: &Path,
         compiler_command_name: String,
         output_option: String,
     ) {
-        if self.has_package(&identifier) {
-            panic!("Package with identifier '{}' already exists!", identifier);
+        if self.has_package(identifier) {
+            panic!("Package with package_root '{}' already exists!", identifier);
         }
 
         let mut package = Package::create(
-            package_root.to_path_buf(),
-            compiler_command_name,
-            output_option,
+            identifier.to_string(),
+            Language {
+                compiler_command_name,
+                output_option,
+            },
         );
 
         Repository::open(package_root)
@@ -88,18 +91,18 @@ impl Registry {
         // replace module dependencies with package module dependencies;
         self.module_dependencies_to_package_module_dependencies(
             removed_modules,
-            identifier.clone(),
+            identifier,
         );
 
-        package.build();
+        package.build(package_root);
 
-        self.packages.insert(identifier, package);
+        self.packages.insert(package_root.to_path_buf(), package);
         self.save();
     }
 
-    fn add_files_to_git(package: &Package) {
+    fn add_files_to_git(package_root: &Path, package: &Package) {
         Command::new("git")
-            .current_dir(&package.package_root)
+            .current_dir(package_root)
             .arg("add")
             .arg("manifest.json")
             .output()
@@ -107,14 +110,14 @@ impl Registry {
 
         for (source_path, module) in package.modules.values() {
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("add")
                 .arg(source_path)
                 .output()
                 .expect("failed to commit changes");
 
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("add")
                 .arg(&module.output_path)
                 .output()
@@ -123,18 +126,18 @@ impl Registry {
     }
 
     pub fn publish(&mut self, identifier: &str, increment: SemVerIncrement) {
-        if let Some(package) = self.get_package_mut(identifier) {
+        if let Some((package_root,package)) = self.get_package_mut(identifier) {
             package.increment_version(increment);
-            Repository::open(&package.package_root).unwrap();
+            Repository::open(&package_root).unwrap();
 
-            assert_ne!(package.get_version(), Version::NotVersioned);
+            assert_ne!(package.version, Version::NotVersioned);
 
-            let msg = format!("updated to version: {}", package.get_version());
+            let msg = format!("updated to version: {}", package.version);
 
-            Self::add_files_to_git(package);
+            Self::add_files_to_git(package_root, package);
 
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("commit")
                 .arg("-m")
                 .arg(msg)
@@ -142,9 +145,9 @@ impl Registry {
                 .expect("failed to commit changes");
 
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("tag")
-                .arg(package.get_version().to_string())
+                .arg(package.version.to_string())
                 .output()
                 .expect("failed to tag commit");
         }
@@ -152,38 +155,37 @@ impl Registry {
     }
 
     pub fn upload(&mut self, identifier: &str, git_url: Option<Url>) {
-
-        if let Some(package) = self.get_package(identifier) {
-            let git_remote_url: Url = git_url.unwrap_or_else(|| package.get_remote_location().unwrap());
-
-            package.set_remote_location(git_remote_url);
+        if let Some((package_root, package)) = self.get_package_mut(identifier) {
+            if package.remote_location.is_none() {
+                package.remote_location = Some(git_url.unwrap())
+            }
 
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("add")
                 .arg("manifest.json")
                 .output()
                 .expect("failed to add manifest");
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("commit")
                 .arg("--amend")
                 .arg("--no-edit")
                 .output()
                 .expect("failed to commit changes");
 
-            Repository::open(&package.package_root).unwrap();
+            Repository::open(package_root).unwrap();
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("remote")
                 .arg("add")
                 .arg("origin")
-                .arg(package.get_remote_location().unwrap().as_str())
+                .arg(package.remote_location.as_ref().unwrap().as_str())
                 .output()
                 .expect("failed add remote");
 
             Command::new("git")
-                .current_dir(&package.package_root)
+                .current_dir(package_root)
                 .arg("push")
                 .arg("-u")
                 .arg("origin")
